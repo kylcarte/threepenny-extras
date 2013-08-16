@@ -12,6 +12,11 @@ p #+! c = p #+ [c]
 
 infixl 8 #+!
 
+(#~) :: IO Element -> String -> IO Element
+e #~ s = e # set UI.html s
+
+infixl 8 #~
+
 -- Div types {{{
 
 rowClass :: IO Element
@@ -74,8 +79,8 @@ role = strAttr "role"
 classes :: WriteAttr Element [String]
 classes = mkWriteAttr (set' UI.class_ . unwords)
 
-data_slug :: WriteAttr Element String
-data_slug = strAttr "data-slug"
+data_ :: String -> WriteAttr Element String
+data_ s = strAttr $ "data-" ++ s
 
 placeholder :: WriteAttr Element String
 placeholder = strAttr "placeholder"

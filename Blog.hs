@@ -105,7 +105,7 @@ blogFooter :: IO Element
 blogFooter = footer # set UI.class_ "row" #+
   [ twelveColClass #+
     [ UI.hr
-    , row6ColClass $ map single
+    , row6ColClass $ map (:[])
       [ par "&copy; Copyright no one at all. Go to town."
       , UI.ul # set classes ["inline-list","right"] #+
         listItems

@@ -26,6 +26,7 @@ setup w = void $ do
 mainPage :: [IO Element]
 mainPage =
   [ top
+  , content contacts
   ]
 
 -- Top Bar {{{
@@ -83,6 +84,23 @@ entry lab lnk = Entry (rawLink lab lnk)
 
 rawLink :: String -> String -> Link
 rawLink lab lnk = Link (Raw lab) lnk
+
+-- }}}
+
+-- Contact {{{
+
+contacts :: [(String,String)]
+contacts =
+  [ ( "Mal Reynolds"      , "mal@serenity.bc.reb"               )
+  , ( "Zoe Washburne"     , "zoe@serenity.bc.reb"               )
+  , ( "Jayne Cobb"        , "jayne@serenity.bc.reb"             )
+  , ( "Simon Tam"         , "doc@serenity.bc.reb"               )
+  , ( "River Tam"         , "killyouwithmymind@serenity.bc.reb" )
+  , ( "Hoban Washburne"   , "leafonthewind@serenity.bc.reb"     )
+  , ( "Shepherd Book"     , "book@serenity.bc.reb"              )
+  , ( "Kaywinnet Lee Fry" , "klee@serenity.bc.reb"              )
+  , ( "Inarra Serra"      , "inara@guild.comp.all"              )
+  ]
 
 -- }}}
 
