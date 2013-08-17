@@ -95,7 +95,7 @@ content cs = rowClass #+!
         , "You can either reach out to us as a whole and one of our awesome team members will get back to you,"
         , "or if you have a specific question reach out to one of our staff."
         , "We love getting email all day "
-        , "<em>all day</em>."
+        , "<em>every day</em>."
         ]
     , contact cs
     ])
@@ -104,18 +104,19 @@ contact :: [(String,String)] -> IO Element
 contact cs = divClasses ["section-container","auto"] #
   set (data_ "section") "" #+
   [ section # set classes ["section","active"] #
-    set UI.style [("padding-top","52px")] #+
-      [ UI.h5 # set UI.class_ "title" #+!
+    set UI.style [("top-padding","52px")] #+
+      [ UI.h5 # set UI.class_ "title" # set UI.style [("left","0px")] #+!
           link "Contact Our Company" "#panel1"
       , divClass "content" # set (data_ "slug") "panel1" #+!
         (UI.form #+ ([yourName,yourEmail] ++ feedback))
       ]
-  , section # set UI.class_ "section" #+
-    [ UI.h5 # set UI.class_ "title" #+!
-        link "Specific Person" "#panel2"
-    , divClass "content" # set (data_ "slug") "panel2" #+!
-      (UI.ul # set UI.class_ "large-block-grid-5" #+ map mkContact cs)
-    ]
+  , section # set UI.class_ "section" #
+    set UI.style [("top-padding","52px")] #+
+      [ UI.h5 # set UI.class_ "title" # set UI.style [("left","100px")] #+!
+          link "Specific Person" "#panel2"
+      , divClass "content" # set (data_ "slug") "panel2" #+!
+        (UI.ul # set UI.class_ "large-block-grid-5" #+ map mkContact cs)
+      ]
   ]
   where
   mkContact (nm,addr) = UI.li #+!

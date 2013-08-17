@@ -22,6 +22,15 @@ setup w = void $ do
   UI.addStyleSheet w "foundation.css"
   UI.addStyleSheet w "normalize.css"
   getBody w #+ mainPage
+  getHead w #+
+    [ script # set UI.src "/static/js/custom.modernizr.js"
+    ]
+  getBody w #+
+    [ script # set UI.src "/static/js/foundation.min.js"
+    , script #~ "$(document).foundation();"
+    -- , script # set UI.src "/static/js/zepto.js"
+    -- , script #~ "document.write('<script src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js><\\/script>')"
+    ]
 
 mainPage :: [IO Element]
 mainPage =

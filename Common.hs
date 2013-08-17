@@ -57,6 +57,9 @@ nav = mkElement "nav"
 section :: IO Element
 section = mkElement "section"
 
+script :: IO Element
+script = mkElement "script"
+
 article :: IO Element
 article = mkElement "article"
 
