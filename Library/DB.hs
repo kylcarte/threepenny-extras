@@ -1,15 +1,17 @@
-{-# LANGUAGE OverloadedStrings #-}
+
+import DBTypes
+import Input
+import Utils
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
+import Database.SQLite.Simple
 
 import Control.Applicative
 import Control.Monad
 import qualified Data.Map as M
 import qualified Data.Text as T
-
-import Database.SQLite.Simple
-import Database.SQLite.Simple.FromRow
+import Data.Maybe (catMaybes,fromMaybe,isJust)
 
 main :: IO ()
 main = do
@@ -19,115 +21,90 @@ main = do
     , tpStatic     = ""
     } setup
 
-data TestField = TestField Int String deriving (Eq,Show)
-
-instance FromRow TestField where
-  fromRow = TestField <$> field <*> field
-
 setup :: Window -> IO ()
 setup w = void $ do
-  return w # set title "Page Switching"
+  conn <- initDB "library.db"
+  getBody w #+ [ newPatronPage conn ]
 
-  conn <- open "test.db"
+newPatronPage :: Connection -> IO Element
+newPatronPage conn = do
+  fnm <- UI.input
+  lnm <- UI.input
+  (_,vs,getPrefCont) <- mkRadios "pc" [("Phone","0"),("Email","1")]
+  ph  <- UI.input
+  em  <- UI.input
+  hm  <- UI.input
+  (b,bv) <- mkButton "Add Patron"
+  tbl <- mkTable
+          [ [ string "First Name"        , element fnm ]
+          , [ string "Last Name"         , element lnm ]
+          , [ string "Phone Number"      , element ph  ]
+          , [ string "Email Address"     , element em  ]
+          , [ string "Home Address"      , element hm  ]
+          , [ string "Preferred Contact" , mkTable [ map element vs ] ]
+          , [ element bv ]
+          ]
+  entryPage <- UI.div #+ [ element tbl ]
+  listPage  <- UI.div #+ [ mkPatronsPage conn ]
+  wholePage <- UI.table #+ [ mkTableRow [ element entryPage , element listPage ] # set UI.valign "top" ]
+  badStr <- string "Please fill in all fields."
+  goodStr <- string "Patron added."
+  on UI.click b $ const $ void $ do
+    vs@[f,l,p,e,h] <- getValuesList [fnm,lnm,ph,em,hm]
+    ci <- getPrefCont
+    if (not (any null vs) && isJust ci)
+    then do
+      c <- case ci of
+             Just "0" -> return (Phone,Email)
+             Just "1" -> return (Email,Phone)
+             _        -> fail $ "No parse for Preferred Contact: " ++ show ci
+      let pat = mkPatron f l c p e h
+      insertPatron conn pat
+      element entryPage # set children [ tbl , goodStr ]
+      ppg <- mkPatronsPage conn
+      element listPage  # set children [ ppg ]
+    else element entryPage # set children [ tbl , badStr ]
+  element wholePage
 
-  inp <- UI.input # set UI.name "TestField"
-  (but1,but1view) <- mkButton "Add"
-  tbl <- UI.table                #
-           set UI.name  "Fields" #
-           set UI.rules "rows"   #
-           set UI.cellpadding 5
-
-  on UI.click but1 $ \_ -> do
-    v <- get value inp
-    insertTestField conn v
-    element inp # set value ""
-    refreshList conn tbl
-
-  refreshList conn tbl
-  getBody w #+
-    [ UI.h1 #+ [ string "Test DB" ]
-    , row [ element inp , element but1view ]
-    , element tbl
-    ]
-
-refreshList :: Connection -> Element -> IO ()
-refreshList conn tbl = void $ do
-  tfs <- getTestFields conn
-  element tbl #~ mapM mkRow tfs
+mkPatronsPage :: Connection -> IO Element
+mkPatronsPage conn = do
+  pats <- getPatrons conn
+  UI.table #+
+    ( patTblHdr
+    : map mkPatRow pats
+    ) # set UI.border 1 # set UI.rules "rows" # set UI.cellpadding 5
   where
-  mkRow tf@(TestField idNo _) = do
-    (but,butView) <- mkButton "Remove"
-    on UI.click but $ \_ -> do
-      deleteTestField conn idNo
-      refreshList conn tbl
+  patTblHdr =
     mkTableRow
-      [ string (show tf)
-      , element but
+      [ string "ID"
+      , string "First Name"
+      , string "Last Name"
+      , string "Preferred Contact"
+      , string "Phone Number"
+      , string "Email Address"
+      , string "Home Address"
+      ]
+  mkPatRow (Patron idNo fn ln c1 _ pn em hm) =
+    mkTableRow
+      [ string $ maybe "N/A" show idNo
+      , string $ T.unpack fn
+      , string $ T.unpack ln
+      , string $ show c1
+      , string $ maybe "" (T.unpack . fromPhoneNumber) pn
+      , string $ maybe "" T.unpack em
+      , string $ maybe "" T.unpack hm
       ]
 
--- DB Operations {{{
-
-insertTestField  :: Connection -> String -> IO ()
-insertTestField  conn str = execute conn "INSERT INTO test (str) VALUES (?)" (Only str)
-
-getTestFields    :: Connection -> IO [TestField]
-getTestFields    conn = query_ conn "SELECT * from test"
-
-deleteTestField  :: Connection -> Int -> IO [TestField]
-deleteTestField  conn idNo = query conn "DELETE from test where ID = ?" (Only idNo)
-
-matchTestFields :: Connection -> String -> IO [TestField]
-matchTestFields conn str = query conn "SELECT * from test where str LIKE ?" (Only $ "%" ++ str ++ "%")
-
-searchTestFields :: Connection -> String -> IO [TestField]
-searchTestFields conn str = query conn "SELECT * from test where str = ?" (Only str)
-
--- }}}
 
 -- Helpers {{{
 
-type Page = IO [Element]
-
-page :: [IO Element] -> Page
-page = sequence
-
-onSelect :: (Element,M.Map String a) -> (a -> IO void) -> IO ()
-onSelect (sel,selMap) f = on (domEvent "change") sel $ \_ -> do
-  k <- get value sel
-  whenJust (M.lookup k selMap) $ \v -> void $ f v
-
-(#~) :: IO Element -> IO [Element] -> IO Element
-e #~ msetup = do
-  es <- msetup
-  e # set children es
-
-mkSelectionMap :: [(String,a)] -> IO (Element, M.Map String a)
-mkSelectionMap optMap = do
-  let (opts,vals) = unzip $ flip map (zip optMap [0..]) $
-                      \((opt,val), i) ->
-                        let ix = show i in ((opt,ix),(ix,val))
-  sel <- mkDropDown opts
-  let selMap = M.fromList vals
-  return (sel,selMap)
+mkTable :: [[IO Element]] -> IO Element
+mkTable ess = UI.table #+ map mkTableRow ess
 
 mkTableRow :: [IO Element] -> IO Element
 mkTableRow es = UI.tr #+ map mkTd es
   where
   mkTd e = UI.td #+ [e]
-
-mkDropDown :: [(String,String)] -> IO Element
-mkDropDown opts = UI.select #~ mapM mkOpt opts
-  where
-  mkOpt (opt,val) = UI.option # set html opt # set value val
-
-mkButton :: String -> IO (Element, Element)
-mkButton title = do
-  button <- UI.button #+ [string title]
-  view   <- UI.p #+ [element button]
-  return (button, view)
-
-whenJust :: (Monad m) => Maybe a -> (a -> m ()) -> m ()
-whenJust m f = maybe (return ()) f m
 
 -- }}}
 

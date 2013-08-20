@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Common where
 
@@ -76,6 +77,13 @@ instance ToElement Link where
   toElement el = lnk # labelElt (linkLabel el)
     where
     lnk = UI.a # set UI.href (linkAddr el)
+
+-- }}}
+
+-- ToElementAction {{{
+
+class ToElementAction a act where
+  toElementAction :: a -> IO (Element,IO act)
 
 -- }}}
 

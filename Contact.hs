@@ -14,8 +14,6 @@ import Data.List (intercalate)
 divider :: IO Element
 divider = UI.li # set classes ["divider"]
 
--- Contact {{{
-
 content :: [(String,String)] -> Row [IO Element]
 content cs = paddedRow
   [ uniformLayout (colWidth 9)
@@ -29,10 +27,29 @@ content cs = paddedRow
         ]
     , toElement $ contact cs
     ]
-  -- , uniformLayout (colWidth 3)
-  --   [
-  --   ]
+  , uniformLayout (colWidth 3)
+    [ UI.h5 #~ "Map"
+    , UI.p #+
+      [ UI.a #
+        set UI.href "" #
+        set (data_ "reveal-id") "mapModal" #+
+        [ UI.img # set UI.src "http://placehold.it/400x280"
+        ]
+      , UI.br
+      , UI.a #
+        set UI.href "" #
+        set (data_ "reveal-id") "mapModal" #~
+          "View Map"
+      ]
+    , UI.p #+
+      [ string "123 Awesome St."
+      , UI.br
+      , string "Barsoom, MA 95155"
+      ]
+    ]
   ]
+
+-- Content Panel {{{
 
 contact :: [(String,String)] -> Sections (IO Element)
 contact cs = Sections "panel" Tabs

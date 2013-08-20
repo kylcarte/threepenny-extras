@@ -14,7 +14,7 @@ import Data.Maybe (catMaybes)
 
 mkButton :: String -> IO (Element, Element)
 mkButton ttl = do
-  button <- UI.button #+ [string ttl]
+  button <- UI.button # set classes ["button"] #+ [string ttl]
   view   <- UI.p #+ [element button]
   return (button, view)
 

@@ -7,9 +7,9 @@ import Control.Monad
 
 import Common
 
-import Foundation.Bar
-import Foundation.Layout
-import Foundation.Sections
+import Graphics.UI.Threepenny.Foundation.Bar
+import Graphics.UI.Threepenny.Foundation.Layout
+import Graphics.UI.Threepenny.Foundation.Sections
 
 main :: IO ()
 main = foundationGUI Config
@@ -22,9 +22,23 @@ setup :: Window -> IO ()
 setup w = void $ do
   getBody w #+
     [ toElement topBar
-    , toElement $ 
-      contacts contactEmails
+    , toElement content
+    , toElement footBar
+    , mapModal
     ]
+
+contactEmails :: [(String,String)]
+contactEmails =
+  [ ( "Mal Reynolds"      , "mal@serenity.bc.reb"               )
+  , ( "Zoe Washburne"     , "zoe@serenity.bc.reb"               )
+  , ( "Jayne Cobb"        , "jayne@serenity.bc.reb"             )
+  , ( "Simon Tam"         , "doc@serenity.bc.reb"               )
+  , ( "River Tam"         , "killyouwithmymind@serenity.bc.reb" )
+  , ( "Hoban Washburne"   , "leafonthewind@serenity.bc.reb"     )
+  , ( "Shepherd Book"     , "book@serenity.bc.reb"              )
+  , ( "Kaywinnet Lee Fry" , "klee@serenity.bc.reb"              )
+  , ( "Inarra Serra"      , "inara@guild.comp.all"              )
+  ]
 
 -- Top Bar {{{
 
@@ -78,41 +92,29 @@ subMenu lab = MenuEntry (dummyLink lab)
 
 -- }}}
 
--- Contacts {{{
+-- Content {{{
 
-contactEmails :: [(String,String)]
-contactEmails =
-  [ ( "Mal Reynolds"      , "mal@serenity.bc.reb"               )
-  , ( "Zoe Washburne"     , "zoe@serenity.bc.reb"               )
-  , ( "Jayne Cobb"        , "jayne@serenity.bc.reb"             )
-  , ( "Simon Tam"         , "doc@serenity.bc.reb"               )
-  , ( "River Tam"         , "killyouwithmymind@serenity.bc.reb" )
-  , ( "Hoban Washburne"   , "leafonthewind@serenity.bc.reb"     )
-  , ( "Shepherd Book"     , "book@serenity.bc.reb"              )
-  , ( "Kaywinnet Lee Fry" , "klee@serenity.bc.reb"              )
-  , ( "Inarra Serra"      , "inara@guild.comp.all"              )
+content :: Row [IO Element]
+content = paddedRow
+  [ uniformLayout (colWidth 9) $ contacts contactEmails
+  , uniformLayout (colWidth 3)   sideBar
   ]
 
 -- }}}
 
 -- Contact {{{
 
-contacts :: [(String,String)] -> Row [IO Element]
-contacts cs = paddedRow
-  [ uniformLayout (colWidth 9)
-    [ UI.h3 #~ "Get in Touch!"
-    , par $ unwords
-        [ "We'd love to hear from you."
-        , "You can either reach out to us as a whole and one of our awesome team members will get back to you,"
-        , "or if you have a specific question reach out to one of our staff."
-        , "We love getting email all day "
-        , "<em>every day</em>."
-        ]
-    , toElement $ contact cs
-    ]
-  -- , uniformLayout (colWidth 3)
-  --   [
-  --   ]
+contacts :: [(String,String)] -> [IO Element]
+contacts cs = 
+  [ UI.h3 #~ "Get in Touch!"
+  , par $ unwords
+      [ "We'd love to hear from you."
+      , "You can either reach out to us as a whole and one of our awesome team members will get back to you,"
+      , "or if you have a specific question reach out to one of our staff."
+      , "We love getting email all day "
+      , "<em>every day</em>."
+      ]
+  , toElement $ contact cs
   ]
 
 contact :: [(String,String)] -> Sections (IO Element)
@@ -165,6 +167,69 @@ feedback =
 
 inlineLabel :: String -> IO Element
 inlineLabel lab = label # set classes ["inline"] #~ lab
+
+-- }}}
+
+-- Side Bar {{{
+
+sideBar :: [IO Element]
+sideBar =
+  [ UI.h5 #~ "Map"
+  , UI.p #+
+    [ UI.a #
+      set UI.href "" #
+      set (data_ "reveal-id") "mapModal" #+
+      [ UI.img # set UI.src "http://placehold.it/400x280"
+      ]
+    , UI.br
+    , UI.a #
+      set UI.href "" #
+      set (data_ "reveal-id") "mapModal" #~
+        "View Map"
+    ]
+  , UI.p #+
+    [ string "123 Awesome St."
+    , UI.br
+    , string "Barsoom, MA 95155"
+    ]
+  ]
+
+-- }}}
+
+-- Foot Bar {{{
+
+footBar :: Row [IO Element]
+footBar = paddedRow
+  [ uniformLayout (colWidth 12)
+    [ UI.hr
+    , toElement $ paddedRow
+      [ uniformLayout (colWidth 6)
+        [ UI.p #~ "&copy; Copyright no one at all. Go to town."
+        ]
+      , uniformLayout (colWidth 6)
+        [ UI.ul #
+          set classes ["inline-list","right"] #+
+          [ UI.li #+ [ UI.a # set UI.href "#" #~ "Link 1" ]
+          , UI.li #+ [ UI.a # set UI.href "#" #~ "Link 2" ]
+          , UI.li #+ [ UI.a # set UI.href "#" #~ "Link 3" ]
+          , UI.li #+ [ UI.a # set UI.href "#" #~ "Link 4" ]
+          ]
+        ]
+      ]
+    ]
+  ]
+
+-- }}}
+
+-- Map {{{
+
+mapModal :: IO Element
+mapModal = divClass "reveal-modal" #
+  set UI.id_ "mapModal" #+
+  [ UI.h4 #~ "Where We Are"
+  , UI.p #+ [UI.img # set UI.src "http://placehold.it/800x600"]
+  , UI.a # set UI.href "#" # set classes ["close-reveal-modal"] #~ "&times;"
+  ]
 
 -- }}}
 
