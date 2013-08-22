@@ -7,7 +7,7 @@ import Graphics.UI.Threepenny.Core
 
 import Common
 
--- Section {{{
+-- Sections {{{
 
 data Sections a = Sections
   { sectionName :: String

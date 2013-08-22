@@ -1,133 +1,109 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
+import Graphics.UI.Threepenny.Foundation.Input
+import Graphics.UI.Threepenny.Foundation.Layout
+import Common
 
 import Control.Applicative
 import Control.Monad
 import qualified Data.Map as M
 import qualified Data.Text as T
 
-import Database.SQLite.Simple
-import Database.SQLite.Simple.FromRow
-
 main :: IO ()
 main = do
-  startGUI Config
+  foundationGUI Config
     { tpPort       = 10000
     , tpCustomHTML = Nothing
-    , tpStatic     = ""
+    , tpStatic     = "static/"
     } setup
-
-data TestField = TestField Int String deriving (Eq,Show)
-
-instance FromRow TestField where
-  fromRow = TestField <$> field <*> field
 
 setup :: Window -> IO ()
 setup w = void $ do
-  return w # set title "Page Switching"
+  getBody w #+ toElements mainPage
 
-  conn <- open "test.db"
+mainPage :: Row (IO Element)
+mainPage = collapseRow
+  [ stackOnSmall (centered 6) $
+    newPatron
+  ]
 
-  inp <- UI.input # set UI.name "TestField"
-  (but1,but1view) <- mkButton "Add"
-  tbl <- UI.table                #
-           set UI.name  "Fields" #
-           set UI.rules "rows"   #
-           set UI.cellpadding 5
+-- New Patron {{{
 
-  on UI.click but1 $ \_ -> do
-    v <- get value inp
-    insertTestField conn v
-    element inp # set value ""
-    refreshList conn tbl
-
-  refreshList conn tbl
-  getBody w #+
-    [ UI.h1 #+ [ string "Test DB" ]
-    , row [ element inp , element but1view ]
-    , element tbl
+newPatron :: IO Element
+newPatron = do
+  let (fstNameFld,getFstName) = textField "First Name*"
+      (lstNameFld,getLstName) = textField "Last Name*"
+      (emailFld  ,getEmail)   = textField "Email*"
+      (phoneFld  ,getPhone)   = textField "Phone No.*"
+      (home1Fld  ,getHome1)   = noteTextField "Address Line 1"
+                                  "Street address, P.O. box"
+      (home2Fld  ,getHome2)   = noteTextField "Address Line 2"
+                                  "Apartment, suite, unit, building, floor, etc."
+      (cityFld   ,getCity)    = textField "City"
+      (zipFld    ,getZip)     = textField "ZIP"
+  (prefRads  ,getPref)       <- toElementsAction prefContRads
+  (stateDD  ,getState)       <- toElementAction statesDropdown
+  panel #+
+    [ UI.h5 #~ "New Patron"
+    , toElement fstNameFld
+    , toElement lstNameFld
+    , toElement emailFld
+    , toElement phoneFld
+    , toElement $ prefContFld prefRads
+    , toElement home1Fld
+    , toElement home2Fld
+    , toElement cityFld
+    , toElement $ labeledField "State" (element stateDD)
+    , toElement zipFld
+    , string "* Required Fields"
+    ]
+  where
+  prefContFld rs = labeledField "Preferred Contact" $
+    UI.ul #
+    set classes ["inline-list"] #+
+      map ((UI.li #+!) . element) rs
+  prefContRads = Radios "prefcont" False
+    [ ( string "Email" # set UI.valign "middle" , "Email" )
+    , ( string "Phone" # set UI.valign "middle" , "Phone" )
     ]
 
-refreshList :: Connection -> Element -> IO ()
-refreshList conn tbl = void $ do
-  tfs <- getTestFields conn
-  element tbl #~ mapM mkRow tfs
-  where
-  mkRow tf@(TestField idNo _) = do
-    (but,butView) <- mkButton "Remove"
-    on UI.click but $ \_ -> do
-      deleteTestField conn idNo
-      refreshList conn tbl
-    mkTableRow
-      [ string (show tf)
-      , element but
-      ]
+noteTextField :: String -> String -> (Row (IO Element),IO String)
+noteTextField lab note =
+  let inp = UI.input # set UI.type_ "text" # set placeholder note
+  in
+  (labeledField lab inp, get value =<< inp)
 
--- DB Operations {{{
+textField :: String -> (Row (IO Element),IO String)
+textField lab = let inp = UI.input # set UI.type_ "text"
+  in
+  (labeledField lab inp, get value =<< inp)
 
-insertTestField  :: Connection -> String -> IO ()
-insertTestField  conn str = execute conn "INSERT INTO test (str) VALUES (?)" (Only str)
+labeledField :: String -> IO Element -> Row (IO Element)
+labeledField lab elt = collapseRow
+  [ uniformLayout (colWidth 3) $ inlineLabel lab
+  , uniformLayout (colWidth 9) elt
+  ]
 
-getTestFields    :: Connection -> IO [TestField]
-getTestFields    conn = query_ conn "SELECT * from test"
+statesDropdown :: Dropdown
+statesDropdown = Dropdown "states" True $ map opt
+  [ "AL" , "AK" , "AZ" , "AR" , "CA"
+  , "CO" , "CT" , "DE" , "FL" , "GA"
+  , "HI" , "ID" , "IL" , "IN" , "IA"
+  , "KS" , "KY" , "LA" , "ME" , "MD"
+  , "MA" , "MI" , "MN" , "MS" , "MO"
+  , "MT" , "NE" , "NV" , "NH" , "NJ"
+  , "NM" , "NY" , "NC" , "ND" , "OH"
+  , "OK" , "OR" , "PA" , "RI" , "SC"
+  , "SD" , "TN" , "TX" , "UT" , "VT"
+  , "VA" , "WA" , "WV" , "WI" , "WY"
+  ]
 
-deleteTestField  :: Connection -> Int -> IO [TestField]
-deleteTestField  conn idNo = query conn "DELETE from test where ID = ?" (Only idNo)
-
-matchTestFields :: Connection -> String -> IO [TestField]
-matchTestFields conn str = query conn "SELECT * from test where str LIKE ?" (Only $ "%" ++ str ++ "%")
-
-searchTestFields :: Connection -> String -> IO [TestField]
-searchTestFields conn str = query conn "SELECT * from test where str = ?" (Only str)
-
--- }}}
-
--- Helpers {{{
-
-type Page = IO [Element]
-
-page :: [IO Element] -> Page
-page = sequence
-
-onSelect :: (Element,M.Map String a) -> (a -> IO void) -> IO ()
-onSelect (sel,selMap) f = on (domEvent "change") sel $ \_ -> do
-  k <- get value sel
-  whenJust (M.lookup k selMap) $ \v -> void $ f v
-
-(#~) :: IO Element -> IO [Element] -> IO Element
-e #~ msetup = do
-  es <- msetup
-  e # set children es
-
-mkSelectionMap :: [(String,a)] -> IO (Element, M.Map String a)
-mkSelectionMap optMap = do
-  let (opts,vals) = unzip $ flip map (zip optMap [0..]) $
-                      \((opt,val), i) ->
-                        let ix = show i in ((opt,ix),(ix,val))
-  sel <- mkDropDown opts
-  let selMap = M.fromList vals
-  return (sel,selMap)
-
-mkTableRow :: [IO Element] -> IO Element
-mkTableRow es = UI.tr #+ map mkTd es
-  where
-  mkTd e = UI.td #+ [e]
-
-mkDropDown :: [(String,String)] -> IO Element
-mkDropDown opts = UI.select #~ mapM mkOpt opts
-  where
-  mkOpt (opt,val) = UI.option # set html opt # set value val
-
-mkButton :: String -> IO (Element, Element)
-mkButton title = do
-  button <- UI.button #+ [string title]
-  view   <- UI.p #+ [element button]
-  return (button, view)
-
-whenJust :: (Monad m) => Maybe a -> (a -> m ()) -> m ()
-whenJust m f = maybe (return ()) f m
 
 -- }}}
+
+inlineLabel :: String -> IO Element
+inlineLabel lab = label # set classes ["inline"] #~ lab
 

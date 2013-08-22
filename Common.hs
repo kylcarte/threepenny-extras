@@ -1,5 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module Common where
 
@@ -45,9 +48,10 @@ foundationGUI c f = startGUI c $ \w -> void $ do
   f w
   getBody w #+
     [ script # set UI.src "/static/js/foundation.min.js"
+    , script # set UI.src "/static/js/foundation.forms.js"
     , script #~ "$(document).foundation();"
-    , script # set UI.src "/static/js/zepto.js"
-    , script #~ "document.write('<script src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js><\\/script>')"
+    -- , script # set UI.src "/static/js/zepto.js"
+    -- , script #~ "document.write('<script src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js><\\/script>')"
     ]
 
 -- Label {{{
@@ -82,8 +86,15 @@ instance ToElement Link where
 
 -- ToElementAction {{{
 
-class ToElementAction a act where
+class ToElementAction a act | a -> act where
   toElementAction :: a -> IO (Element,IO act)
+
+-- }}}
+
+-- ToElementsAction {{{
+
+class ToElementsAction a act | a -> act where
+  toElementsAction :: a -> IO ([Element],IO act)
 
 -- }}}
 
@@ -112,6 +123,9 @@ class ToElements a where
 instance ToElements (IO Element) where
   toElements = (:[])
 
+instance ToElement a => ToElements a where
+  toElements a = toElements [a]
+
 instance ToElement a => ToElements [a] where
   toElements = map toElement
 
@@ -125,12 +139,22 @@ instance (ToElement a,ToElement b,ToElement c,ToElement d)
   => ToElements (a,b,c,d) where
   toElements (a,b,c,d) = [toElement a,toElement b,toElement c,toElement d]
 
+instance (ToElements a, ToElements b) => ToElements (Either a b) where
+  toElements (Left a) = toElements a
+  toElements (Right b) = toElements b
+
 -- }}}
 
 -- Div types {{{
 
 rowClass :: IO Element
 rowClass = divClass "row"
+
+panel :: IO Element
+panel = divClass "panel"
+
+center :: IO Element
+center = UI.div # set UI.align "center"
 
 divClass :: String -> IO Element
 divClass c = divClasses [c]
@@ -200,6 +224,12 @@ legend = mkElement "legend"
 -- }}}
 
 -- Attributes  {{{
+
+checked :: WriteAttr Element Bool
+checked = mkWriteAttr $ \b ->
+  if b
+  then set' (strAttr "CHECKED") ""
+  else const $ return ()
 
 disabled :: WriteAttr Element Bool
 disabled = mkWriteAttr $ \b ->
