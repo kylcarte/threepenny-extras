@@ -1,12 +1,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Graphics.UI.Threepenny.Foundation.Input where
+module Foundation.Input where
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
-
-import Common
+import Foundation.Common
 
 import Control.Applicative
 import Control.Monad

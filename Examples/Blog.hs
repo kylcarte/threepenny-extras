@@ -1,14 +1,13 @@
 
-module Blog where
+module Examples.Blog where
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
+import Foundation.Common
 
 import Control.Applicative
 import Data.List (intersperse)
 import Data.IORef
-
-import Common
 
 -- Nav Bar {{{
 

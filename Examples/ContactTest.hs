@@ -1,15 +1,14 @@
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
+import Foundation.Common
+
+import Foundation.Bar
+import Foundation.Layout
+import Foundation.Sections
 
 import Control.Applicative
 import Control.Monad
-
-import Common
-
-import Graphics.UI.Threepenny.Foundation.Bar
-import Graphics.UI.Threepenny.Foundation.Layout
-import Graphics.UI.Threepenny.Foundation.Sections
 
 main :: IO ()
 main = foundationGUI Config
@@ -120,7 +119,8 @@ contacts cs =
 contact :: [(String,String)] -> Sections (IO Element)
 contact cs = Sections "panel" Tabs
   [ ( LabelStr "Contact Our Company"
-    , UI.form #+ (toElement yourName : toElement yourEmail : toElements feedback)
+    , do fb <- toElements feedback
+         UI.form #+ (toElement yourName : toElement yourEmail : map element fb)
     )
   , ( LabelStr "Specific Person"
     , toElement $ stackGridOnSmall 5 $ map mkContact cs

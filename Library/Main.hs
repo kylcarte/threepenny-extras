@@ -3,13 +3,15 @@
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
-import Graphics.UI.Threepenny.Foundation.Input
-import Graphics.UI.Threepenny.Foundation.Layout
-import Graphics.UI.Threepenny.Foundation.Sections
-import Common
 
-import qualified Data.ByteString.Lazy.Char8 as BS
-import qualified Text.Email.Validate as Email
+import Foundation.Input
+import Foundation.Layout
+import Foundation.Sections
+import Foundation.Common
+
+import qualified Text.Parsec as P
+import qualified Text.Parsec.Char as P
+import qualified Text.ParserCombinators.Parsec.Rfc2822 as P
 
 import Control.Applicative
 import Control.Monad
@@ -36,14 +38,14 @@ mainPage w = collapseRow
   [ stackOnSmall (centered 6) $
     toElement $
     Sections "Tabs" Tabs
-      [ newPatron w Nothing
+      [ newPatron
       ]
   ]
 
 -- New Patron {{{
 
-newPatron :: Window -> Maybe (String,String) -> (Label,IO [IO Element])
-newPatron w missing =
+newPatron :: (Label,IO [IO Element])
+newPatron =
   ( LabelStr "New Patron"
   , do (fstNameFld , getFstName) <- textField "First Name*"
        (lstNameFld , getLstName) <- textField "Last Name*"
@@ -57,6 +59,7 @@ newPatron w missing =
        (cityFld    , getCity   ) <- textField "City"
        (stateDD    , getState  ) <- toElementAction statesDropdown
        (zipFld     , getZip    ) <- textField "ZIP"
+       alertArea                 <- UI.div
        resultArea                <- UI.textarea
        let validateInput = do
              fstName <- getFstName
@@ -69,12 +72,13 @@ newPatron w missing =
              city    <- getCity
              state   <- getState
              zipCd   <- getZip
-             validate         (notNull  fstName) (badInput "First Name") $
-               validate       (notNull  lstName) (badInput "Last Name") $
-                 validate     (emailBad email  ) (badInput "Email") $
-                   validate   (phoneBad phone  ) (badInput "Phone") $
-                     validate (havePref pref   ) (badInput "Preferred Contact") $
+             validate         (notNull  fstName) (setAlert alertArea "First Name"       ) $
+               validate       (notNull  lstName) (setAlert alertArea "Last Name"        ) $
+                 validate     (emailBad email  ) (setAlert alertArea "Email"            ) $
+                   validate   (phoneBad phone  ) (setAlert alertArea "Phone"            ) $
+                     validate (havePref pref   ) (setAlert alertArea "Preferred Contact") $
                        void $ do
+                         element alertArea # set children []
                          element resultArea # set value (unwords
                                    [ fstName , lstName
                                    , email   , phone   , fromMaybe "N/A" pref
@@ -92,7 +96,6 @@ newPatron w missing =
          , toElement emailFld
          , toElement phoneFld
          , toElement $ labeledField "Preferred Contact*" $ inlineList $ map element prefRads
-         , UI.hr
          , toElement home1Fld
          , toElement home2Fld
          , toElement cityFld
@@ -100,12 +103,12 @@ newPatron w missing =
          , toElement zipFld
          , UI.h5 #+! (UI.small #~ "* Required Fields")
          , UI.hr
+         , toElement $ paddedRow [uniformLayout (centered 10) (center #+! element alertArea)]
          , toElement submitBtn
          , element resultArea
          ]
   )
   where
-  badInput = undefined
   prefContRads = Radios "prefcont" False
     [ ( string "Email" # set UI.valign "middle" , "Email" )
     , ( string "Phone" # set UI.valign "middle" , "Phone" )
@@ -123,6 +126,26 @@ newPatron w missing =
     , "VA" , "WA" , "WV" , "WI" , "WY"
     ]
 
+clearAlert :: Element -> IO ()
+clearAlert e = void $ element e # set children []
+
+setAlert :: Element -> String -> String -> IO ()
+setAlert e typ msg = void $ do
+  alrt <- UI.div #
+    set (data_ "alert") "" #
+    set classes ["alert-box","alert","round"] #~
+      ("*** " ++ msg ++ " " ++ typ ++ " ***")
+  element e # set children
+    [ alrt
+    ]
+
+{-
+<div data-alert class="alert-box">
+  <!-- Your content goes here -->
+    <a href="#" class="close">&times;</a>
+    </div>
+-}
+
 validate :: Maybe String -> (String -> IO a) -> IO a -> IO a
 validate testRes onFail onSuccess = maybe onSuccess onFail testRes
 
@@ -134,11 +157,11 @@ notNull as
 emailBad :: String -> Maybe String
 emailBad em = if null em
   then Just "Missing"
-  else case Email.validate $ toBS em of
-         Left err -> Just err
+  else case parseEmail em of
+         Left err -> Just "Malformed"
          Right _  -> Nothing
   where
-  toBS s = BS.pack s
+  parseEmail = P.parse P.addr_spec ""
 
 phoneBad :: String -> Maybe String
 phoneBad ph = if null ph

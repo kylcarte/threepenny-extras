@@ -1,9 +1,9 @@
 
-module Graphics.UI.Threepenny.Foundation.Bar where
+module Foundation.Bar where
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
-import Common
+import Foundation.Common
 
 import Control.Applicative
 import Data.List (intercalate)

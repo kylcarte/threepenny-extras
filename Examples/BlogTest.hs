@@ -2,13 +2,12 @@
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
+import Foundation.Common
+import Examples.Blog
 
 import Control.Applicative
 import Control.Monad
 import Data.List (intersperse)
-
-import Blog
-import Common
 
 main :: IO ()
 main = do

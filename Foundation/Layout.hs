@@ -1,12 +1,12 @@
 
-module Graphics.UI.Threepenny.Foundation.Layout where
+module Foundation.Layout where
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
+import Foundation.Common
 
 import Data.Maybe (catMaybes, isJust)
 
-import Common
 
 -- Row {{{
 

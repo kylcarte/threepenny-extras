@@ -1,11 +1,10 @@
 {-# LANGUAGE ViewPatterns #-}
 
-module Graphics.UI.Threepenny.Foundation.Sections where
+module Foundation.Sections where
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
-
-import Common
+import Foundation.Common
 
 -- Sections {{{
 
