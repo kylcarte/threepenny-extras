@@ -66,7 +66,7 @@ instance ToElements a => ToElement (Column a) where
       | wid > 0 && off < 12 && (wid + off) <= 12
         = return
             [ maybeWhen cen       $ size "centered"
-            , maybeWhen (off > 0) $ size $ show off
+            , maybeWhen (off > 0) $ size $ "offset-" ++ show off
             , maybeWhen True      $ size $ show wid
             ]
       | otherwise = fail $ "Bad column layout: " ++ show l

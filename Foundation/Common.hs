@@ -38,11 +38,9 @@ modify at f mx = do
 
 foundationGUI :: Config -> (Window -> IO ()) -> IO ()
 foundationGUI c f = startGUI c $ \w -> void $ do
+  _ <- getHead w #+ [ script # set UI.src "/static/js/custom.modernizr.js" ]
   UI.addStyleSheet w "normalize.css"
   UI.addStyleSheet w "foundation.css"
-  _ <- getHead w #+
-         [ script # set UI.src "/static/js/custom.modernizr.js"
-         ]
   f w
   getBody w #+
     [ script # set UI.src "/static/js/foundation.min.js"
