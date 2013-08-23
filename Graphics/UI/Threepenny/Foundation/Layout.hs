@@ -55,8 +55,8 @@ instance ToElements a => ToElement (Column a) where
     smOpts <- formSmallOpts smL
     lgOpts <- formLargeOpts lgL
     let opts = catMaybes $ smOpts ++ lgOpts
-    divClasses (opts ++ ["columns"]) #+
-      toElements a
+    cts <- toElements a
+    divClasses (opts ++ ["columns"]) #+ map element cts
     where
     formSmallOpts = formSizeOpts ("small-" ++)
     formLargeOpts = formSizeOpts ("large-" ++)
@@ -113,7 +113,8 @@ data Grid a = Grid
 instance ToElements a => ToElement (Grid a) where
   toElement (Grid smSize lgSize cs) = do
     opts <- mkOpts
-    UI.ul # set classes (catMaybes opts) # set UI.style [] #+ map ((UI.li #+) . toElements) cs
+    css  <- mapM toElements cs
+    UI.ul # set classes (catMaybes opts) # set UI.style [] #+ map ((UI.li #+) . map element) css
     where
     mkOpts
       | isJust smSize || isJust lgSize = return

@@ -49,7 +49,8 @@ data Button = Button
 
 instance ToElement Button where
   toElement (Button lbl s act) = do
-    but <- UI.button # set classes ("button" : buttonClasses s) #+ toElements lbl
+    lbl' <- toElements lbl
+    but <- UI.button # set classes ("button" : buttonClasses s) #+ map element lbl'
     on UI.click but $ const act
     element but
 
@@ -171,15 +172,17 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
     mkOption chkd ((a,val),i) = do
       let idStr = nm ++ show i
       inp <- UI.input #*
-        [ set UI.name nm
-        , set UI.type_ "radio"
-        , set UI.id_ idStr
-        ]
+               [ set UI.name nm
+               , set UI.type_ "radio"
+               , set UI.id_ idStr
+               , set value val
+               ]
+      cts <- toElements a
       lab <- label # set for idStr #+
-        ( element inp
-        : UI.span #~ " "
-        : toElements a
-        )
+               ( element inp
+               : UI.span #~ " "
+               : map element cts
+               )
       return (inp,lab)
 
 -- }}}
@@ -192,10 +195,10 @@ data Checkboxes a = Checkboxes
   }
 
 instance ToElements a => ToElementsAction (Checkboxes a) [String] where
-  toElementsAction (Checkboxes _ []) = fail "Empty Checkboxes Options"
+  toElementsAction (Checkboxes _ []) = fail "Empty Checkbox Options"
   toElementsAction (Checkboxes nm (c:cs)) = do
     (c',v)   <- mkOption c
-    (cs',vs) <- unzip <$> mapM mkOption cs
+    (cs',vs) <- fmap unzip $ mapM mkOption cs
     let getVal = fmap catMaybes $ forM (c':cs') $ \cbx -> do
                    chkd <- get UI.checked cbx
                    if chkd
@@ -205,18 +208,20 @@ instance ToElements a => ToElementsAction (Checkboxes a) [String] where
     where
     mkOption (a,val,chkd) = do
       inp <- UI.input #*
-        [ set UI.name nm
-        , set UI.type_ "checkbox"
-        , set UI.id_ nm
-        , set UI.style [("display","none")]
-        , if chkd then set UI.checked True else id
-        ]
+               [ set UI.name nm
+               , set UI.type_ "checkbox"
+               , set UI.id_ nm
+               , set UI.style [("display","none")]
+               , set value val
+               , if chkd then set UI.checked True else id
+               ]
+      cts <- toElements a
       lab <- label # set for nm #+
-        ( element inp
-        : UI.span #
-          set classes ((if chkd then ("checked" :) else id) ["custom","checkbox"])
-        : toElements a
-        )
+               ( element inp
+               : UI.span #
+                 set classes ((if chkd then ("checked" :) else id) ["custom","checkbox"])
+               : map element cts
+               )
       return (inp,lab)
 
 -- }}}
@@ -229,10 +234,11 @@ data LegendFor a = LegendFor
   }
 
 instance ToElements a => ToElement (LegendFor a) where
-  toElement (LegendFor leg a) =
+  toElement (LegendFor leg a) = do
+    cts <- toElements a
     fieldset #+
       ( legend #~ leg
-      : toElements a
+      : map element cts
       )
 
 -- }}}
@@ -246,10 +252,11 @@ data LabelFor a = LabelFor
   }
 
 instance ToElement a => ToElements (LabelFor a) where
-  toElements (LabelFor idStr lbl a) =
-    [ label # set for idStr #+ toElements lbl
-    , toElement a # set UI.id_ idStr
-    ]
+  toElements (LabelFor idStr lbl a) = do
+    lbl' <- toElements lbl
+    lab <- label # set for idStr #+ map element lbl'
+    anch <- toElement a # set UI.id_ idStr
+    return [ lab , anch ]
 
 -- }}}
 

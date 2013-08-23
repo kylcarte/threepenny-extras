@@ -21,21 +21,25 @@ instance ToElements a => ToElement (Sections a) where
     divClasses ["section-container",typClass] #
       set (data_ "section") typStyle #+ (mkActive c : map mkInactive (zip cs [1..]))
     where
-    mkActive (l,cnt) = let pNm = mkSectionName 0 in
+    mkActive (l,cnt) = let pNm = mkSectionName 0 in do
+      ces <- toElements cnt
       section # set classes ["section","active"] #+
         [ mkSectionLink pNm l
-        , divClass "content" # set (data_ "slug") pNm #+ toElements cnt
+        , divClass "content" # set (data_ "slug") pNm #+ map element ces
         ]
-    mkInactive ((l,cnt),i) = let pNm = mkSectionName i in
+    mkInactive ((l,cnt),i) = let pNm = mkSectionName i in do
+      ces <- toElements cnt
       section # set classes ["section"] #+
         [ mkSectionLink pNm l
-        , divClass "content" # set (data_ "slug") pNm #+ toElements cnt
+        , divClass "content" # set (data_ "slug") pNm #+ map element ces
         ]
     mkSectionName :: Int -> String
     mkSectionName i = nm ++ show i
     mkSectionLink :: String -> Label -> IO Element
-    mkSectionLink pNm l = UI.h5 # set classes ["title"] #+!
-      (UI.a # set UI.href ("#" ++ pNm) #+ toElements l)
+    mkSectionLink pNm l = do
+      l' <- toElements l
+      UI.h5 # set classes ["title"] #+!
+        (UI.a # set UI.href ("#" ++ pNm) #+ map element l')
 
 -- }}}
 

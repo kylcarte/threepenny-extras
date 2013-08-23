@@ -3,8 +3,9 @@ module Graphics.UI.Threepenny.Foundation.Bar where
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
-
 import Common
+
+import Control.Applicative
 import Data.List (intercalate)
 
 -- MenuEntry {{{
@@ -22,7 +23,9 @@ instance ToElement MenuEntry where
                     , mkSections
                     ]
     where
-    mkSections = UI.ul # set classes ["dropdown"] #+ intercalate [divider] (map toElements ss)
+    mkSections = do 
+      ss' <- mapM toElements ss
+      UI.ul # set classes ["dropdown"] #+ intercalate [divider] (map (map element) ss')
 
 -- }}}
 
@@ -35,7 +38,7 @@ data MenuSection = MenuSection
 
 instance ToElements MenuSection where
   toElements (MenuSection Nothing es) = toElements es
-  toElements (MenuSection (Just nm) es) = mkSectionLabel nm : toElements es
+  toElements (MenuSection (Just nm) es) = (:) <$> mkSectionLabel nm <*> toElements es
     where
     mkSectionLabel l = UI.li #+! (label #~ l)
 

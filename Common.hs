@@ -1,7 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
 module Common where
@@ -61,8 +59,8 @@ data Label
   | LabelEls [IO Element]
 
 instance ToElements Label where
-  toElements (LabelStr s ) = [UI.span #~ s]
-  toElements (LabelEls es) = es
+  toElements (LabelStr s ) = sequence [UI.span #~ s]
+  toElements (LabelEls es) = sequence es
 
 labelElt :: Label -> IO Element -> IO Element
 labelElt (LabelStr s ) e = e #~ s
@@ -118,30 +116,38 @@ instance (ToElement a,ToElement b) => ToElement (Either a b) where
 -- ToElements {{{
 
 class ToElements a where
-  toElements :: a -> [IO Element]
+  toElements :: a -> IO [Element]
 
 instance ToElements (IO Element) where
-  toElements = (:[])
+  toElements = fmap (:[])
 
-instance ToElement a => ToElements a where
-  toElements a = toElements [a]
+instance ToElements [Element] where
+  toElements = return
+
+instance ToElements (IO [Element]) where
+  toElements = id
+
+instance ToElements (IO [IO Element]) where
+  toElements m = do
+    es <- m
+    sequence es
 
 instance ToElement a => ToElements [a] where
-  toElements = map toElement
+  toElements = mapM toElement
 
-instance (ToElement a,ToElement b) => ToElements (a,b) where
-  toElements (a,b) = [toElement a,toElement b]
-
-instance (ToElement a,ToElement b,ToElement c) => ToElements (a,b,c) where
-  toElements (a,b,c) = [toElement a,toElement b,toElement c]
-
-instance (ToElement a,ToElement b,ToElement c,ToElement d)
-  => ToElements (a,b,c,d) where
-  toElements (a,b,c,d) = [toElement a,toElement b,toElement c,toElement d]
-
-instance (ToElements a, ToElements b) => ToElements (Either a b) where
-  toElements (Left a) = toElements a
-  toElements (Right b) = toElements b
+-- instance (ToElement a,ToElement b) => ToElements (a,b) where
+--   toElements (a,b) = [toElement a,toElement b]
+-- 
+-- instance (ToElement a,ToElement b,ToElement c) => ToElements (a,b,c) where
+--   toElements (a,b,c) = [toElement a,toElement b,toElement c]
+-- 
+-- instance (ToElement a,ToElement b,ToElement c,ToElement d)
+--   => ToElements (a,b,c,d) where
+--   toElements (a,b,c,d) = [toElement a,toElement b,toElement c,toElement d]
+-- 
+-- instance (ToElements a, ToElements b) => ToElements (Either a b) where
+--   toElements (Left a) = toElements a
+--   toElements (Right b) = toElements b
 
 -- }}}
 
