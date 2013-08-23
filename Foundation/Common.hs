@@ -40,9 +40,9 @@ foundationGUI :: Config -> (Window -> IO ()) -> IO ()
 foundationGUI c f = startGUI c $ \w -> void $ do
   UI.addStyleSheet w "normalize.css"
   UI.addStyleSheet w "foundation.css"
-  getHead w #+
-    [ script # set UI.src "/static/js/custom.modernizr.js"
-    ]
+  _ <- getHead w #+
+         [ script # set UI.src "/static/js/custom.modernizr.js"
+         ]
   f w
   getBody w #+
     [ script # set UI.src "/static/js/foundation.min.js"
@@ -272,6 +272,9 @@ strAttr = mkWriteAttr . set' . attr
 
 maybeWhen :: Bool -> a -> Maybe a
 maybeWhen b a = if b then Just a else Nothing
+
+whenJust :: (Monad m) => Maybe a -> (a -> m ()) -> m ()
+whenJust m f = maybe (return ()) f m
 
 -- }}}
 

@@ -163,11 +163,12 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
                       then Just <$> get value rad
                       else return Nothing
                     case vals of
-                      [v] -> return $ Just v
+                      [x] -> return $ Just x
                       []  -> return Nothing
                       _   -> fail $ "More than one radio button checked??: " ++ show vals
     return (v:vs,getVal)
     where
+    mkOption :: ToElements a => Bool -> ((a,String),Integer) -> IO (Element,Element)
     mkOption chkd ((a,val),i) = do
       let idStr = nm ++ show i
       inp <- UI.input #*
@@ -175,6 +176,7 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
                , set UI.type_ "radio"
                , set UI.id_ idStr
                , set value val
+               , set checked chkd
                ]
       cts <- toElements a
       lab <- label # set for idStr #+
