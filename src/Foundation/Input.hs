@@ -160,8 +160,8 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
     let getVal = do vals <- fmap catMaybes $ forM (r':rs') $ \rad -> do
                       chkd <- get UI.checked rad
                       if chkd
-                      then Just <$> get value rad
-                      else return Nothing
+                        then Just <$> get value rad
+                        else return Nothing
                     case vals of
                       [x] -> return $ Just x
                       []  -> return Nothing
@@ -203,8 +203,8 @@ instance ToElements a => ToElementsAction (Checkboxes a) [String] where
     let getVal = fmap catMaybes $ forM (c':cs') $ \cbx -> do
                    chkd <- get UI.checked cbx
                    if chkd
-                   then Just <$> get value cbx
-                   else return Nothing
+                     then Just <$> get value cbx
+                     else return Nothing
     return (v:vs,getVal)
     where
     mkOption (a,val,chkd) = do
