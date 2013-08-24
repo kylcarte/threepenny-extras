@@ -62,8 +62,8 @@ newPatron conn =
           -- Validation          | Acceptable Condition  | Failure Action
              validate                notNull     fstName (inputFailure "First Name"       ) $
                validate              notNull     lstName (inputFailure "Last Name"        ) $
-                 validate            emailValid  email   (inputFailure "Email"            ) $
-                   validateOut       phoneValid  phone   (inputFailure "Phone"            ) $ \ph ->
+                 validate            emailValid  email   (inputFailure "Email Address"    ) $
+                   validateOut       phoneValid  phone   (inputFailure "Phone Number"     ) $ \ph ->
                      validateOut     havePref    pref    (inputFailure "Preferred Contact") $ \cont ->
                        validateOut   zipValid    zipCd   (inputFailure "Zip Code"         ) $ \zp ->
                          validateOut patNumValid patNum  (inputFailure "Patron Number"    ) $ \mpn ->
@@ -112,8 +112,9 @@ newPatron conn =
          , UI.h5 #+! (UI.small #~ "* Required Fields")
          , UI.hr
          , toElement $ paddedRow
-           [ uniformLayout (colWidth 9) $
-               center #+! element alertArea
+           [ uniformLayout (colWidth 9) $ toElement $ paddedRow
+             [ uniformLayout (centered 10) $ center #+! element alertArea
+             ]
            , uniformLayout (colWidth 3) $
              element submitBtn
            ]
