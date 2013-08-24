@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 
 module Foundation.Layout where
 
@@ -13,7 +14,7 @@ import Data.Maybe (catMaybes, isJust)
 data Row a = Row
   { rowCollapse :: Bool
   , rowColumns  :: [Column a]
-  }
+  } deriving (Functor)
 
 instance ToElements a => ToElement (Row a) where
   toElement (Row coll cs)
@@ -48,7 +49,7 @@ data Column a = Column
   { smallLayout :: Maybe Layout
   , largeLayout :: Maybe Layout
   , colContent  :: a
-  }
+  } deriving (Functor)
 
 instance ToElements a => ToElement (Column a) where
   toElement (Column smL lgL a) = do
@@ -108,7 +109,7 @@ data Grid a = Grid
   { smallRowSize :: Maybe Int
   , largeRowSize :: Maybe Int
   , gridContents :: [a]
-  }
+  } deriving (Functor)
 
 instance ToElements a => ToElement (Grid a) where
   toElement (Grid smSize lgSize cs) = do

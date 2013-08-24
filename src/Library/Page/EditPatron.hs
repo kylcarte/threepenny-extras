@@ -1,5 +1,5 @@
 
-module Library.Page.NewPatron where
+module Library.Page.EditPatron where
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
@@ -12,16 +12,16 @@ import Library.Page.PatronInfo
 
 import Database.SQLite.Simple
 
-newPatronPage :: Connection -> Page
-newPatronPage conn = patronInfo conn addPatronAction
+editPatronPage :: Connection -> Page
+editPatronPage conn = patronInfo conn editPatronAction
 
 -- Add Patron {{{
-addPatronAction :: Connection
+editPatronAction :: Connection
                 -> Element
                 -> (Integer -> Patron)
                 -> Maybe Integer
                 -> IO ()
-addPatronAction conn alertArea mkPat mPatNum = do
+editPatronAction conn alertArea mkPat mPatNum = do
   mpn <- case mPatNum of
     -- New Patron
     Nothing -> do

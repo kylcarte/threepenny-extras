@@ -155,6 +155,23 @@ insertPatron conn p = execute conn
   , cityStateZip p
   )
 
+updatePatron :: Connection -> Patron -> IO ()
+updatePatron conn p = case patronDBId p of
+  Nothing   -> fail "Bug: Tried to update patron without providing database ID"
+  Just idNo -> execute conn
+    "UPDATE patrons SET patronnum = ?, firstname = ?, lastname = ?, prefcont = ?, phonenumber = ?, emailaddr = ?, homeaddr1 = ?, homeaddr2 = ?, citystatezip = ? WHERE ID = ?"
+    ( patronNum    p
+    , firstName    p
+    , lastName     p
+    , prefContact  p
+    , phoneNumber  p
+    , emailAddr    p
+    , homeAddr1    p
+    , homeAddr2    p
+    , cityStateZip p
+    , idNo
+    )
+
 getPatrons :: Connection -> IO [Patron]
 getPatrons conn = query_ conn
   "SELECT * FROM patrons"

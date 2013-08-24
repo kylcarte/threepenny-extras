@@ -8,6 +8,7 @@ import Foundation.Common
 
 import Library.DBTypes
 import Library.Page.NewPatron
+import Library.Page.EditPatron
 
 import Database.SQLite.Simple
 
@@ -33,6 +34,7 @@ mainPage conn = collapseRow
     toElement $
     Sections "Tabs" Tabs
       [ newPatron conn
+      , editPatron conn
       ]
   ]
 

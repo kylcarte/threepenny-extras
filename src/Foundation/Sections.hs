@@ -8,13 +8,12 @@ import Foundation.Common
 
 -- Sections {{{
 
-type Section a = (Label,a)
-type Page = Section (IO [IO Element])
+type Page = IO [IO Element]
 
 data Sections a = Sections
   { sectionName :: String
   , sectionType :: SectionType
-  , sectionCnts :: [Section a]
+  , sectionCnts :: [(Label,a)]
   }
 
 instance ToElements a => ToElement (Sections a) where
