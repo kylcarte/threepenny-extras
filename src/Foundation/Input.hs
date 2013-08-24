@@ -116,7 +116,7 @@ data Dropdown = Dropdown
 instance ToElementAction Dropdown String where
   toElementAction d = do
     sel <- UI.select # set UI.id_ (dropdownId d) #+ map toElement
-             ((if dropdownBlankDef d then (opt "--" :) else id) $
+             ((if dropdownBlankDef d then (opt "" :) else id) $
               dropdownOpts d)
     return (sel, get value sel)
 

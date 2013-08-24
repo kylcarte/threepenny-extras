@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module DBTypes where
+module Library.DBTypes where
 
 import Database.SQLite.Simple
 import Database.SQLite.Simple.FromField
@@ -14,6 +14,8 @@ import System.Process
 
 import Control.Applicative
 import Control.Monad
+import Data.Char (isDigit)
+import Data.List (intercalate)
 
 initDB :: FilePath -> IO Connection
 initDB fp = do
@@ -34,35 +36,40 @@ initDB fp = do
 -- Patron {{{
 
 data Patron = Patron
-  { patronId     :: Maybe Integer      -- Maybe, so we can construct Patrons
+  { patronDBId   :: Maybe Integer      -- Maybe, so we can construct Patrons
+  , patronNum    :: Integer
   , firstName    :: String               --  and insert them conveniently
   , lastName     :: String
+  , phoneNumber  :: PhoneNumber
+  , emailAddr    :: String
   , prefContact  :: Contact
-  , phoneNumber  :: Maybe PhoneNumber
-  , emailAddr    :: Maybe String
-  , homeAddr1    :: Maybe String
-  , homeAddr2    :: Maybe String
-  , cityStateZip :: Maybe String
+  , homeAddr1    :: String
+  , homeAddr2    :: String
+  , cityStateZip :: CityStateZip
   } deriving (Eq,Show)
 
 instance FromRow Patron where
   fromRow = Patron
         <$> (Just <$> field) -- patronId
+        <*> field            -- patronNum
         <*> field <*> field  -- first, last names
-        <*> field            -- preferred means of contact
         <*> field <*> field  -- phone, email
+        <*> field            -- preferred means of contact
         <*> field <*> field  -- home address 1 & 2
         <*> field            -- cityStateZip
 
-{-
-mkPatron :: String -> String
+type PhoneNumber = String
+type Email = String
+type Addr  = String
+
+mkPatron :: Integer
+         -> String -> String
+         -> PhoneNumber
+         -> Email
          -> Contact
-         -> Maybe PhoneNumber
-         -> Maybe String
-         -> Maybe String -> Maybe String
-         -> Maybe String
+         -> Addr -> Addr
+         -> CityStateZip
          -> Patron
--}
 mkPatron = Patron Nothing
 
 -- We support FromRow and *not* ToRow, because we will be inserting Patrons
@@ -71,19 +78,6 @@ mkPatron = Patron Nothing
 
 -- However, for abstraction's sake, the newtyped fields of Patron support
 -- ToField behavior, so they do not need to be deconstructed at substitution time.
-
-newtype PhoneNumber = PhoneNumber { fromPhoneNumber :: String } deriving (Eq,Show)
-
-instance FromField PhoneNumber where
-  fromField f = PhoneNumber <$> fromField f
-
-instance ToField PhoneNumber where
-  toField (PhoneNumber n) = toField n
-
-mkPhoneNumber :: String -> Maybe PhoneNumber
-mkPhoneNumber = Just . PhoneNumber
-
-
 
 data Contact
   = Phone
@@ -106,6 +100,35 @@ instance ToField Contact where
           Phone -> 0
           Email -> 1
 
+
+
+data CityStateZip = CSZ
+  { viewCity  :: String
+  , viewState :: String
+  , viewZipCd :: String
+  } deriving (Eq,Show)
+
+semiSep :: String -> Ok (String,String)
+semiSep inp = case break (== ';') inp of
+  (r,';':s') -> return (r,s')
+  _          -> fail $ "Not semicolon separated: " ++ inp
+
+instance FromField CityStateZip where
+  fromField f = fcsz =<< fromField f
+    where
+    fcsz :: String -> Ok CityStateZip
+    fcsz s0 = do (ct,s1) <- semiSep s0
+                 (st,zp) <- semiSep s1
+                 if length zp == 5 && all isDigit zp
+                   then return $ CSZ ct st zp
+                   else fail $ "Malformed Zipcode: " ++ zp
+
+instance ToField CityStateZip where
+  toField (CSZ c s z) 
+    | all null [c,s,z] = toField ("" :: String)
+    | otherwise
+      = toField $ intercalate ";" [c,s,z]
+
 -- }}}
 
 -- Patron DB {{{
@@ -116,12 +139,13 @@ checkPatronTable conn = do
   when (null (res :: [Only String])) $ do
     putStrLn "Creating patrons table."
     execute_ conn
-      "CREATE TABLE patrons (ID INTEGER PRIMARY KEY, firstname TEXT NOT NULL, lastname TEXT NOT NULL, prefcont INTEGER NOT NULL, phonenumber TEXT, emailaddr TEXT, homeaddr1 TEXT, homeaddr2 TEXT, citystatezip TEXT)"
+      "CREATE TABLE patrons (ID INTEGER PRIMARY KEY, patronnum INTEGER NOT NULL, firstname TEXT NOT NULL, lastname TEXT NOT NULL, prefcont INTEGER NOT NULL, phonenumber TEXT NOT NULL, emailaddr TEXT NOT NULL, homeaddr1 TEXT NOT NULL, homeaddr2 TEXT NOT NULL, citystatezip TEXT NOT NULL)"
 
 insertPatron :: Connection -> Patron -> IO ()
 insertPatron conn p = execute conn
-  "INSERT INTO patrons VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ( firstName    p
+  "INSERT INTO patrons VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ( patronNum    p
+  , firstName    p
   , lastName     p
   , prefContact  p
   , phoneNumber  p
@@ -134,6 +158,10 @@ insertPatron conn p = execute conn
 getPatrons :: Connection -> IO [Patron]
 getPatrons conn = query_ conn
   "SELECT * FROM patrons"
+
+getPatronNumbers :: Connection -> IO [Integer]
+getPatronNumbers conn = map fromOnly <$> query_ conn
+  "SELECT patronnum FROM patrons"
 
 deletePatron :: Connection -> Integer -> IO [Patron]
 deletePatron conn idNo = query conn
@@ -161,9 +189,9 @@ searchPatronsLastName conn x = query conn
   "SELECT * FROM patrons WHERE lastname = ?"
   (Only x)
 
-searchPatronsId :: Connection -> Integer -> IO [Patron]
-searchPatronsId conn x = query conn
-  "SELECT * FROM patrons WHERE ID = ?"
+searchPatronsNum :: Connection -> Integer -> IO [Patron]
+searchPatronsNum conn x = query conn
+  "SELECT * FROM patrons WHERE patronnum = ?"
   (Only x)
 
 -- }}}

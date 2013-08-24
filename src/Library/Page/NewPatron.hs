@@ -4,20 +4,29 @@ module Library.Page.NewPatron where
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
 
+import Foundation.Common
 import Foundation.Input
 import Foundation.Layout
-import Foundation.Common
+import Foundation.Sections (Page)
+
+import Library.DBTypes
+
+import Database.SQLite.Simple
 
 import qualified Text.Parsec as P
 import qualified Text.ParserCombinators.Parsec.Rfc2822 as P
+import System.Random
 
 import Control.Monad
 import Data.Char  (isDigit)
 
+numDigitsPatron :: Int
+numDigitsPatron = 6
+
 -- New Patron {{{
 
-newPatron :: (Label,IO [IO Element])
-newPatron =
+newPatron :: Connection -> Page
+newPatron conn =
   ( LabelStr "New Patron"
   , do (fstNameFld , getFstName) <- textField "First Name*"
        (lstNameFld , getLstName) <- textField "Last Name*"
@@ -25,16 +34,19 @@ newPatron =
        (phoneFld   , getPhone  ) <- textField "Phone No.*"
        (prefRads   , getPref   ) <- toElementsAction prefContRads
        (home1Fld   , getHome1  ) <- noteTextField "Address Line 1"
-                                     "Street address, P.O. box"
+                                      "Street address, P.O. box"
        (home2Fld   , getHome2  ) <- noteTextField "Address Line 2"
-                                     "Apartment, suite, unit, building, floor, etc."
+                                      "Apartment, suite, unit, building, floor, etc."
        (cityFld    , getCity   ) <- textField "City"
        (stateDD    , getState  ) <- toElementAction statesDropdown
        (zipFld     , getZip    ) <- textField "ZIP"
+       (patNumFld  , getPatNum ) <- noteTextField "Existing Patron Number"
+                                      "Only needed if adding an existing patron!"
        alertArea                 <- UI.div
 
        let inputFailure = setAlert alertArea
        let inputSuccess = setSuccess alertArea
+       let inputResult  = setResult alertArea
        let validateInput = do
              fstName <- getFstName
              lstName <- getLstName
@@ -46,14 +58,42 @@ newPatron =
              city    <- getCity
              state   <- getState
              zipCd   <- getZip
-             validate         (notNull    fstName) (inputFailure "First Name"       ) $
-               validate       (notNull    lstName) (inputFailure "Last Name"        ) $
-                 validate     (emailValid email  ) (inputFailure "Email"            ) $
-                   validate   (phoneValid phone  ) (inputFailure "Phone"            ) $
-                     validate (havePref   pref   ) (inputFailure "Preferred Contact") $
-                       void $ do
-                         inputSuccess
-                         {- insertPatron -}
+             patNum  <- getPatNum
+          -- Validation          | Acceptable Condition  | Failure Action
+             validate                notNull     fstName (inputFailure "First Name"       ) $
+               validate              notNull     lstName (inputFailure "Last Name"        ) $
+                 validate            emailValid  email   (inputFailure "Email"            ) $
+                   validateOut       phoneValid  phone   (inputFailure "Phone"            ) $ \ph ->
+                     validateOut     havePref    pref    (inputFailure "Preferred Contact") $ \cont ->
+                       validateOut   zipValid    zipCd   (inputFailure "Zip Code"         ) $ \zp ->
+                         validateOut patNumValid patNum  (inputFailure "Patron Number"    ) $ \mpn ->
+                           void $ do
+                          -- Validation Success
+                             mpn' <- case mpn of
+                               -- New Patron
+                               Nothing -> do
+                                 n <- genPatronNum conn
+                                 inputResult n
+                                 return $ Just n
+                               -- Existing Patron
+                               Just n  -> do
+                                 ns <- getPatronNumbers conn
+                                 if n `elem` ns
+                                   then do
+                                     inputFailure "Patron Number" "Already Existing"
+                                     return Nothing
+                                   else do
+                                     inputSuccess
+                                     return $ Just n
+                             whenJust mpn' $ \pn -> do
+                               let pat = mkPatron pn
+                                          fstName lstName
+                                          ph email cont
+                                          home1 home2
+                                          (CSZ city state zp)
+                               putStrLn $ "Adding Patron: " ++ fstName ++ " " ++ lstName ++ " : " ++ show pn
+                               insertPatron conn pat
+
        submitBtn <- toElement $ Button (LabelStr "Submit") radiusBtnStyle validateInput
 
        return
@@ -67,10 +107,16 @@ newPatron =
          , toElement cityFld
          , toElement $ labeledField "State" $ element stateDD
          , toElement zipFld
+         , UI.hr
+         , toElement patNumFld
          , UI.h5 #+! (UI.small #~ "* Required Fields")
          , UI.hr
-         , toElement $ paddedRow [uniformLayout (centered 10) (center #+! element alertArea)]
-         , toElement $ paddedRow [uniformLayout (offset 9 3) (element submitBtn)]
+         , toElement $ paddedRow
+           [ uniformLayout (colWidth 9) $
+               center #+! element alertArea
+           , uniformLayout (colWidth 3) $
+             element submitBtn
+           ]
          ]
   )
   where
@@ -91,30 +137,57 @@ newPatron =
     , "VA" , "WA" , "WV" , "WI" , "WY"
     ]
 
+-- }}}
+
+-- Success/Failure Alerts {{{
+
 setSuccess :: Element -> IO ()
 setSuccess e = void $ do
-  alrt <- UI.div #
-    set (data_ "alert") "" #
-    set classes ["alert-box","success","round"] #~
-      "Patron Added!"
+  alrt <- alertBox ["success","round"] "Patron Added!"
+  element e # set children [ alrt ]
+
+setResult :: Element -> Integer -> IO ()
+setResult e n = void $ do
+  alrt <- toElement $ calloutPanel
+            [ center #+! (UI.h5 #~ "New Patron Number")
+            , center #+! (UI.h1 #~ show n)
+            ]
   element e # set children [ alrt ]
 
 setAlert :: Element -> String -> String -> IO ()
 setAlert e typ msg = void $ do
-  alrt <- UI.div #
-    set (data_ "alert") "" #
-    set classes ["alert-box","alert","round"] #~
-      ("*** " ++ msg ++ " " ++ typ ++ " ***")
+  alrt <- alertBox ["alert","round"] (msg ++ " " ++ typ)
   element e # set children [ alrt ]
 
-validate :: Maybe String -> (String -> IO a) -> IO a -> IO a
-validate testRes onFail onSuccess = maybe onSuccess onFail testRes
+calloutPanel :: [IO Element] -> Column (IO Element)
+calloutPanel es = uniformLayout (centered 8) $
+  UI.div # set classes ["callout","panel"] #+ es
 
+alertBox :: [String] -> String -> IO Element
+alertBox cs msg = UI.div #
+  set (data_ "alert") "" #
+  set classes ("alert-box" : cs) #~
+    msg
+
+-- }}}
+
+-- Input Validation {{{
+
+-- only validate
+validate :: (a -> Maybe String) -> a -> (String -> IO b) -> IO b -> IO b
+validate test a onFail onSuccess = maybe onSuccess onFail $ test a
+
+-- validate with some sanitized result
+validateOut :: (a -> Either String res) -> a -> (String -> IO b) -> (res -> IO b) -> IO b
+validateOut test a onFail onSuccess = either onFail onSuccess $ test a
+
+-- Names
 notNull :: [a] -> Maybe String
 notNull as
   | null as   = Just "Missing"
   | otherwise = Nothing
 
+-- Email
 emailValid :: String -> Maybe String
 emailValid em = if null em
   then Just "Missing"
@@ -124,19 +197,60 @@ emailValid em = if null em
   where
   parseEmail = P.parse P.addr_spec ""
 
-phoneValid :: String -> Maybe String
+-- Phone Number
+phoneValid :: String -> Either String String
 phoneValid ph = if null ph
-  then Just "Missing"
+  then Left "Missing"
   else if all (\c -> isDigit c || elem c phoneNumAcceptableOtherChars) ph
-    then Nothing
-    else Just "Malformed"
+    then Right $ filter isDigit ph
+    else Left "Malformed"
 
 phoneNumAcceptableOtherChars :: [Char]
 phoneNumAcceptableOtherChars = " ()-"
 
-havePref :: Maybe String -> Maybe String
-havePref (Just _) = Nothing
-havePref Nothing  = Just "Missing"
+-- Zip Code
+zipValid :: String -> Either String String
+zipValid zp
+  | null zp   = Right ""
+  | length zp == 5 && all isDigit zp = Right zp
+  | length zp == 10 &&
+    zp !! 5 == '-' && 
+    all isDigit (take 5 zp) &&
+    all isDigit (take 4 $ reverse zp) = Right $ take 5 zp
+  | otherwise = Left "Malformed"
+
+-- Preferred Contact
+havePref :: Maybe String -> Either String Contact
+havePref (Just "Email") = Right Email
+havePref (Just "Phone") = Right Phone
+havePref (Just _)       = Left "Malformed"
+havePref Nothing        = Left "Missing"
+
+-- Patron Number
+patNumValid :: String -> Either String (Maybe Integer)
+patNumValid n
+  | null n        = Right Nothing
+  | length n == numDigitsPatron && all isDigit n
+    = Right $ Just $ read n
+  | otherwise     = Left "Malformed"
+
+-- }}}
+
+-- Patron Number {{{
+
+genPatronNum :: Connection -> IO Integer
+genPatronNum = genPatronNumDigits numDigitsPatron
+
+genPatronNumDigits :: Int -> Connection -> IO Integer
+genPatronNumDigits digits conn = do
+  ns <- getPatronNumbers conn
+  go ns
+  where
+  go ns = do
+    n <- randomRIO (10 ^ (digits - 1), (10 ^ digits) - 1)
+    if n `elem` ns
+      then go ns
+      else return n
 
 -- }}}
 

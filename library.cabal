@@ -29,4 +29,6 @@ executable library
                        json           >=0.4   && <0.6 ,
                        process        ==1.1.*         ,
                        parsec         ==3.1.*         ,
+                       random         ==1.0.*         ,
+                       sqlite-simple  ==0.4.*         ,
                        threepenny-gui ==0.2.*

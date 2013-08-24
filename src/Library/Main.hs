@@ -6,29 +6,33 @@ import Foundation.Layout
 import Foundation.Sections
 import Foundation.Common
 
-import Control.Monad
-
+import Library.DBTypes
 import Library.Page.NewPatron
+
+import Database.SQLite.Simple
+
+import Control.Monad
 
 main :: IO ()
 main = do
+  conn <- initDB "library.db"
   foundationGUI Config
     { tpPort       = 10000
     , tpCustomHTML = Nothing
     , tpStatic     = "static/"
-    } setup
+    } $ setup conn
 
-setup :: Window -> IO ()
-setup w = void $ do
-  p <- toElement mainPage
+setup :: Connection -> Window -> IO ()
+setup conn w = void $ do
+  p <- toElement $ mainPage conn
   getBody w #+ [ element p ]
 
-mainPage :: Row (IO Element)
-mainPage = collapseRow
+mainPage :: Connection -> Row (IO Element)
+mainPage conn = collapseRow
   [ stackOnSmall (centered 6) $
     toElement $
     Sections "Tabs" Tabs
-      [ newPatron
+      [ newPatron conn
       ]
   ]
 
