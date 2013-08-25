@@ -41,6 +41,16 @@ collapseRow = Row True
 paddedRow :: [Column a] -> Row a
 paddedRow = Row False
 
+pad :: ToElements a => a -> IO Element
+pad a = toElement $ paddedRow
+  [ uniformLayout (centered 11) a
+  ]
+
+split :: ToElements a => [(Int,a)] -> IO Element
+split cols = toElement $ paddedRow $ map mkCol cols
+  where
+  mkCol (width,cnt) = uniformLayout (colWidth width) cnt
+
 -- }}}
 
 -- Col {{{

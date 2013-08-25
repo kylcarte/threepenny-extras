@@ -37,38 +37,38 @@ initDB fp = do
 
 data Patron = Patron
   { patronDBId   :: Maybe Integer      -- Maybe, so we can construct Patrons
-  , patronNum    :: Integer
   , firstName    :: String               --  and insert them conveniently
   , lastName     :: String
   , phoneNumber  :: PhoneNumber
-  , emailAddr    :: String
+  , emailAddr    :: Email
   , prefContact  :: Contact
-  , homeAddr1    :: String
-  , homeAddr2    :: String
+  , homeAddr1    :: Addr
+  , homeAddr2    :: Addr
   , cityStateZip :: CityStateZip
+  , patronNum    :: Integer
   } deriving (Eq,Show)
 
 instance FromRow Patron where
   fromRow = Patron
         <$> (Just <$> field) -- patronId
-        <*> field            -- patronNum
         <*> field <*> field  -- first, last names
         <*> field <*> field  -- phone, email
         <*> field            -- preferred means of contact
         <*> field <*> field  -- home address 1 & 2
         <*> field            -- cityStateZip
+        <*> field            -- patronNum
 
 type PhoneNumber = String
 type Email = String
 type Addr  = String
 
-mkPatron :: Integer
-         -> String -> String
+mkPatron :: String -> String
          -> PhoneNumber
          -> Email
          -> Contact
          -> Addr -> Addr
          -> CityStateZip
+         -> Integer
          -> Patron
 mkPatron = Patron Nothing
 
@@ -119,19 +119,30 @@ instance FromField CityStateZip where
     fcsz :: String -> Ok CityStateZip
     fcsz s0 = do (ct,s1) <- semiSep s0
                  (st,zp) <- semiSep s1
-                 if length zp == 5 && all isDigit zp
+                 if  length zp == 0 ||
+                    (length zp == 5 && all isDigit zp)
                    then return $ CSZ ct st zp
                    else fail $ "Malformed Zipcode: " ++ zp
 
 instance ToField CityStateZip where
-  toField (CSZ c s z) 
-    | all null [c,s,z] = toField ("" :: String)
-    | otherwise
-      = toField $ intercalate ";" [c,s,z]
+  toField (CSZ c s z) = toField $ intercalate ";" [c,s,z]
 
 -- }}}
 
 -- Patron DB {{{
+
+{-
+  { patronDBId   :: Maybe Integer      -- Maybe, so we can construct Patrons
+  , firstName    :: String               --  and insert them conveniently
+  , lastName     :: String
+  , phoneNumber  :: PhoneNumber
+  , emailAddr    :: Email
+  , prefContact  :: Contact
+  , homeAddr1    :: Addr
+  , homeAddr2    :: Addr
+  , cityStateZip :: CityStateZip
+  , patronNum    :: Integer
+-}
 
 checkPatronTable :: Connection -> IO ()
 checkPatronTable conn = do
@@ -139,36 +150,36 @@ checkPatronTable conn = do
   when (null (res :: [Only String])) $ do
     putStrLn "Creating patrons table."
     execute_ conn
-      "CREATE TABLE patrons (ID INTEGER PRIMARY KEY, patronnum INTEGER NOT NULL, firstname TEXT NOT NULL, lastname TEXT NOT NULL, prefcont INTEGER NOT NULL, phonenumber TEXT NOT NULL, emailaddr TEXT NOT NULL, homeaddr1 TEXT NOT NULL, homeaddr2 TEXT NOT NULL, citystatezip TEXT NOT NULL)"
+      "CREATE TABLE patrons (ID INTEGER PRIMARY KEY, firstname TEXT NOT NULL, lastname TEXT NOT NULL, phonenumber TEXT NOT NULL, emailaddr TEXT NOT NULL, prefcont INTEGER NOT NULL, homeaddr1 TEXT NOT NULL, homeaddr2 TEXT NOT NULL, citystatezip TEXT NOT NULL, patronnum INTEGER NOT NULL)"
 
 insertPatron :: Connection -> Patron -> IO ()
 insertPatron conn p = execute conn
   "INSERT INTO patrons VALUES (null, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ( patronNum    p
-  , firstName    p
+  ( firstName    p
   , lastName     p
-  , prefContact  p
   , phoneNumber  p
   , emailAddr    p
+  , prefContact  p
   , homeAddr1    p
   , homeAddr2    p
   , cityStateZip p
+  , patronNum    p
   )
 
 updatePatron :: Connection -> Patron -> IO ()
 updatePatron conn p = case patronDBId p of
   Nothing   -> fail "Bug: Tried to update patron without providing database ID"
   Just idNo -> execute conn
-    "UPDATE patrons SET patronnum = ?, firstname = ?, lastname = ?, prefcont = ?, phonenumber = ?, emailaddr = ?, homeaddr1 = ?, homeaddr2 = ?, citystatezip = ? WHERE ID = ?"
-    ( patronNum    p
-    , firstName    p
+    "UPDATE patrons SET firstname = ?, lastname = ?, phonenumber = ?, emailaddr = ?, prefcont = ?, homeaddr1 = ?, homeaddr2 = ?, citystatezip = ?, patronnum = ? WHERE ID = ?"
+    ( firstName    p
     , lastName     p
-    , prefContact  p
     , phoneNumber  p
     , emailAddr    p
+    , prefContact  p
     , homeAddr1    p
     , homeAddr2    p
     , cityStateZip p
+    , patronNum    p
     , idNo
     )
 
@@ -196,9 +207,9 @@ matchPatronsLastName conn x = query conn
   "SELECT * FROM patrons WHERE lastname LIKE ?"
   (Only $ concat ["%",x,"%"])
 
-searchPatronsFirstName :: Connection -> String -> IO [Patron]
-searchPatronsFirstName conn x = query conn
-  "SELECT * FROM patrons WHERE firstname = ?"
+searchPatronsNum :: Connection -> Integer -> IO [Patron]
+searchPatronsNum conn x = query conn
+  "SELECT * FROM patrons WHERE patronnum = ?"
   (Only x)
 
 searchPatronsLastName :: Connection -> String -> IO [Patron]
@@ -206,9 +217,9 @@ searchPatronsLastName conn x = query conn
   "SELECT * FROM patrons WHERE lastname = ?"
   (Only x)
 
-searchPatronsNum :: Connection -> Integer -> IO [Patron]
-searchPatronsNum conn x = query conn
-  "SELECT * FROM patrons WHERE patronnum = ?"
+searchPatronsEmail :: Connection -> String -> IO [Patron]
+searchPatronsEmail conn x = query conn
+  "SELECT * FROM patrons WHERE emailaddr = ?"
   (Only x)
 
 -- }}}

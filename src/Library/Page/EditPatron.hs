@@ -9,51 +9,28 @@ import Foundation.Sections (Page)
 
 import Library.DBTypes
 import Library.Page.PatronInfo
+import Library.Page.PatronSearch
 
 import Database.SQLite.Simple
 
+import Control.Monad
+
 editPatronPage :: Connection -> Page
-editPatronPage conn = patronInfo conn editPatronAction
+editPatronPage conn = patronSearch
+  conn
+  viewPatronInfo
+  ()
 
--- Add Patron {{{
-editPatronAction :: Connection
-                -> Element
-                -> (Integer -> Patron)
-                -> Maybe Integer
-                -> IO ()
-editPatronAction conn alertArea mkPat mPatNum = do
-  mpn <- case mPatNum of
-    -- New Patron
-    Nothing -> do
-      n <- genPatronNum conn
-      displayInfo alertArea
-        [ center #+ [ UI.h5 #~ "New Patron Number" ]
-        , center #+ [ UI.h1 #~ show n ]
-        ]
-      return $ Just n
-
-    -- Existing Patron
-    Just n  -> do
-      ns <- getPatronNumbers conn
-      if n `elem` ns
-        then do
-          displayFailure alertArea
-            "Patron Number Is Already Taken"
-          return Nothing
-        else do
-          displaySuccess alertArea
-            "Patron Added!"
-          return $ Just n
-
-  -- All Set to Go
-  whenJust mpn $ \pn -> do
-    let pat = mkPat pn
-    putStrLn $ concat
-      [ "Adding Patron: "
-      , firstName pat , " " , lastName pat
-      , " : "   , show pn
-      ]
-    insertPatron conn pat
-
--- }}}
+viewPatronInfo :: PatronSearch ()
+viewPatronInfo
+  area
+  conn
+  thisPatron
+  searchResults
+  _ = void $ do
+    pi <- patronInfo editPatronAction ()
+    element area # set children [] #+ pi
+    
+editPatronAction :: PatronInfo ()
+editPatronAction = undefined
 

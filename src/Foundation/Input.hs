@@ -152,6 +152,9 @@ data Radios a = Radios
   , radioOptions    :: [(a,String)]
   }
 
+radOpt :: String -> (IO Element, String)
+radOpt s = (string s, s)
+
 instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
   toElementsAction (Radios _ _ []) = fail "Empty Radio Options"
   toElementsAction (Radios nm fstChkd (r:rs)) = do
@@ -179,7 +182,9 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
                , set checked chkd
                ]
       cts <- toElements a
-      lab <- label # set for idStr #+
+      lab <- label #
+             set for idStr #
+             set UI.valign "middle" #+
                ( element inp
                : UI.span #~ " "
                : map element cts

@@ -16,87 +16,99 @@ import Database.SQLite.Simple
 
 import qualified Text.Parsec as P
 import qualified Text.ParserCombinators.Parsec.Rfc2822 as P
-import System.Random
+import System.Random hiding (split)
 
-import Control.Applicative
+import Control.Applicative hiding (optional)
 import Control.Monad
 import Data.Char (isDigit)
 import Data.List (elemIndex)
 
+type PatronInfo extra
+  =  Element
+  -> Connection
+  -> PatronFields
+  -> String -> String
+  -> PhoneNumber -> Email -> Contact
+  -> Addr -> Addr
+  -> CityStateZip
+  -> Maybe Integer -- PatronNumber
+  -> extra
+  -> IO ()
+
 -- Patron Info {{{
 
-patronInfo :: Connection
-           -> (   Connection          -- DB Connection
-               -> Element             -- Alert Area
-               -> (Integer -> Patron) -- All other information bundled
-                                      --   just needing a patron number
-               -> Maybe Integer       -- Patron Number from Form
-               -> IO ())
+patronInfo :: PatronInfo extra
+           -> Connection
+           -> extra
            -> Page
-patronInfo conn patronAction = do
-  -- Make Fields
-  fstNameFld         <- textField "First Name"        "First Name*"
-  lstNameFld         <- textField "Last Name"         "Last Name*"
-  emailFld           <- textField "Email Address"     "Email*"
-  phoneFld           <- textField "Phone Number"      "Phone No.*"
-  prefFld            <- radsField prefRads
-                                  "Preferred Contact" "Preferred Contact*"
-  home1Fld           <- noteTextField "Home Addr1"    "Address Line 1"
-                          "Street address, P.O. box"
-  home2Fld           <- noteTextField "Home Addr2"    "Address Line 2"
-                          "Apartment, suite, unit, building, floor, etc."
-  cityFld            <- textField "City" "City"
-  stateFld           <- dropdownField statesDropdown "State" "State"
-  zipFld             <- textField "Zip Code" "ZIP"
-  patNumFld          <- noteTextField "Patron Number" "Existing Patron Number"
-                          "Only needed if adding an existing patron!"
-
-  alertArea          <- UI.div
-  let validate = validateField alertArea
+patronInfo validatedAction conn extra = do
+  pf        <- mkPatronFields
+  alertArea <- UI.div
   submitBtn <- toElement $ 
     Button (LabelStr "Submit") radiusBtnStyle $
-      -- Validate Input
-      validate fstNameFld notNull     $ \fstName ->
-      validate lstNameFld notNull     $ \lstName ->
-      validate emailFld   emailValid  $ \email   ->
-      validate phoneFld   phoneValid  $ \phone   ->
-      validate prefFld    havePref    $ \pref    ->
-      validate zipFld     zipValid    $ \zipCd   ->
-      validate patNumFld  patNumValid $ \mpn     -> do
-        -- Input Validation Success
-        home1   <- getValue home1Fld
-        home2   <- getValue home2Fld
-        city    <- getValue cityFld
-        state   <- getValue stateFld
-        -- Validate Patron Number with DB
-        let mkPat pn = mkPatron pn
-              fstName lstName
-              phone email pref
-              home1 home2
-              (CSZ city state zipCd)
-        patronAction conn alertArea mkPat mpn
-
+      validatePatronFields pf
+        validatedAction
+        alertArea
+        conn
+        extra
+  let renderFld fld = toElement $ fieldContent $ fld pf
   return
-    [ render fstNameFld , render lstNameFld
-    , render emailFld   , render phoneFld   , render prefFld
-    , render home1Fld   , render home2Fld
-    , render cityFld    , render stateFld   , render zipFld
+    [ renderFld fstNameFld , renderFld lstNameFld
+    , renderFld emailFld   , renderFld phoneFld   , renderFld prefFld
     , UI.hr
-    , render patNumFld
+    , renderFld home1Fld   , renderFld home2Fld
+    , renderFld cityFld    , renderFld stateFld   , renderFld zipFld
+    , UI.hr
+    , renderFld patNumFld
     , UI.h5 #+ [ UI.small #~ "* Required Fields" ]
     , UI.hr
-    , toElement $ paddedRow
-      [ uniformLayout (colWidth 9) $ toElement $ paddedRow
-        [ uniformLayout (centered 10) $ center #+! element alertArea
-        ]
-      , uniformLayout (colWidth 3) $
-        element submitBtn
+    , pad $
+      split
+      [ ( 9 , pad $ center #+! element alertArea )
+      , ( 3 , right #+! element submitBtn        )
       ]
     ]
+
+-- }}}
+
+-- Patron Fields {{{
+
+data PatronFields = PatronFields
+  { fstNameFld :: Field String
+  , lstNameFld :: Field String
+  , emailFld   :: Field String
+  , phoneFld   :: Field String
+  , prefFld    :: Field (Maybe String)
+  , home1Fld   :: Field String
+  , home2Fld   :: Field String
+  , cityFld    :: Field String
+  , stateFld   :: Field String
+  , zipFld     :: Field String
+  , patNumFld  :: Field String
+  }
+
+mkPatronFields :: IO PatronFields
+mkPatronFields =
+      PatronFields
+  <$> required textField "First Name"
+  <*> required textField "Last Name"
+  <*> required textField "Email Address"
+  <*> required textField "Phone Number"
+  <*> required
+        (radsField
+         prefRads)       "Preferred Contact"
+  <*> optional textField "Home Address 1"
+  <*> optional textField "Home Address 2"
+  <*> optional textField "City"
+  <*> optional
+        (dropdownField
+         statesDropdown) "State"
+  <*> optional textField "Zip Code"
+  <*> optional textField "Patron Number"
   where
-  prefRads = Radios "prefcont" False
-    [ ( string "Email" # set UI.valign "middle" , "Email" )
-    , ( string "Phone" # set UI.valign "middle" , "Phone" )
+  prefRads = Radios "prefcont" False $ map radOpt
+    [ "Email"
+    , "Phone"
     ]
   statesDropdown = Dropdown "states" True $ map opt
     [ "AL" , "AK" , "AZ" , "AR" , "CA"
@@ -110,6 +122,44 @@ patronInfo conn patronAction = do
     , "SD" , "TN" , "TX" , "UT" , "VT"
     , "VA" , "WA" , "WV" , "WI" , "WY"
     ]
+
+optional :: (String -> String -> IO (Field a))
+         -> String
+         -> IO (Field a)
+optional f typ = f typ typ
+required :: (String -> String -> IO (Field a))
+         -> String
+         -> IO (Field a)
+required f typ = f typ (typ ++ "*")
+
+validatePatronFields :: PatronFields
+                     -> PatronInfo extra
+                     -> Element
+                     -> Connection
+                     -> extra
+                     -> IO ()
+validatePatronFields pf validatedFn alertArea conn extra =
+  validate fstNameFld notNull     $ \fstName ->
+  validate lstNameFld notNull     $ \lstName ->
+  validate emailFld   emailValid  $ \email   ->
+  validate phoneFld   phoneValid  $ \phone   ->
+  validate prefFld    havePref    $ \pref    ->
+  validate zipFld     zipValid    $ \zipCd   ->
+  validate patNumFld  patNumValid $ \mpn     -> do
+    -- Input Validation Success
+    home1   <- getValue $ home1Fld pf
+    home2   <- getValue $ home2Fld pf
+    city    <- getValue $ cityFld  pf
+    state   <- getValue $ stateFld pf
+    validatedFn alertArea conn pf
+      fstName lstName
+      phone email pref
+      home1 home2
+      (CSZ city state zipCd)
+      mpn
+      extra
+  where
+  validate fld = validateWithArea alertArea $ fld pf
 
 -- }}}
 
@@ -150,8 +200,8 @@ vdtFail = Left
 vdtSucc :: a -> Validate a
 vdtSucc = Right
 
-validateField :: Element -> Field a -> (a -> Validate res) -> (res -> IO ()) -> IO ()
-validateField e fld test onSuccess = do
+validateWithArea :: Element -> Field a -> (a -> Validate res) -> (res -> IO ()) -> IO ()
+validateWithArea e fld test onSuccess = do
   v <- getValue fld
   case test v of
     Left  err -> displayFailure e (err ++ " " ++ fieldType fld)
@@ -238,9 +288,6 @@ data Field a = Field
   , getValue     :: IO a
   , setValue     :: a -> IO ()
   }
-
-render :: Field a -> IO Element
-render = toElement . fieldContent
 
 dropdownField :: Dropdown -> String -> String -> IO (Field String)
 dropdownField dd typ lab = do

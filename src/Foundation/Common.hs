@@ -160,6 +160,9 @@ panel = divClass "panel"
 center :: IO Element
 center = UI.div # set UI.align "center"
 
+right :: IO Element
+right = UI.div # set UI.align "right"
+
 divClass :: String -> IO Element
 divClass c = divClasses [c]
 
@@ -225,6 +228,12 @@ fieldset = mkElement "fieldset"
 legend :: IO Element
 legend = mkElement "legend"
 
+thead :: IO Element
+thead = mkElement "thead"
+
+tbody :: IO Element
+tbody = mkElement "tbody"
+
 -- }}}
 
 -- Attributes  {{{
@@ -263,6 +272,10 @@ placeholder = strAttr "placeholder"
 
 strAttr :: String -> WriteAttr Element String
 strAttr = mkWriteAttr . set' . attr
+
+widthPerc :: WriteAttr Element String
+widthPerc = mkWriteAttr $ \s ->
+  set' (strAttr "width") (s ++ "%")
 
 -- }}}
 

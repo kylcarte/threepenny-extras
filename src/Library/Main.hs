@@ -7,8 +7,8 @@ import Foundation.Sections
 import Foundation.Common
 
 import Library.DBTypes
-import Library.Page.NewPatron
-import Library.Page.EditPatron
+import Library.Page.AddPatron
+import Library.Page.PatronSearch
 
 import Database.SQLite.Simple
 
@@ -30,11 +30,11 @@ setup conn w = void $ do
 
 mainPage :: Connection -> Row (IO Element)
 mainPage conn = collapseRow
-  [ stackOnSmall (centered 6) $
+  [ stackOnSmall (centered 10) $
     toElement $
     Sections "Tabs" Tabs
-      [ newPatron conn
-      , editPatron conn
+      [ ( LabelStr "Add Patron"    , addPatronPage conn )
+      , ( LabelStr "Patron Search" , patronSearch  conn )
       ]
   ]
 

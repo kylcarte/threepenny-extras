@@ -1,5 +1,5 @@
 
-module Library.Page.NewPatron where
+module Library.Page.AddPatron where
 
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
@@ -12,16 +12,21 @@ import Library.Page.PatronInfo
 
 import Database.SQLite.Simple
 
-newPatronPage :: Connection -> Page
-newPatronPage conn = patronInfo conn addPatronAction
+addPatronPage :: Connection -> Page
+addPatronPage conn = patronInfo
+  addPatronAction
+  conn
+  ()
 
--- Add Patron {{{
-addPatronAction :: Connection
-                -> Element
-                -> (Integer -> Patron)
-                -> Maybe Integer
-                -> IO ()
-addPatronAction conn alertArea mkPat mPatNum = do
+addPatronAction :: PatronInfo ()
+addPatronAction alertArea conn pf
+  fstNm lstNm
+  phone email pref
+  home1 home2
+  csz
+  mPatNum
+  _ = do
+
   mpn <- case mPatNum of
     -- New Patron
     Nothing -> do
@@ -47,13 +52,16 @@ addPatronAction conn alertArea mkPat mPatNum = do
 
   -- All Set to Go
   whenJust mpn $ \pn -> do
-    let pat = mkPat pn
+    let pat = mkPatron
+                fstNm lstNm
+                phone email pref
+                home1 home2
+                csz
+                pn
     putStrLn $ concat
       [ "Adding Patron: "
       , firstName pat , " " , lastName pat
       , " : "   , show pn
       ]
     insertPatron conn pat
-
--- }}}
 
