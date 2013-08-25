@@ -83,14 +83,14 @@ instance ToElement Link where
 -- ToElementAction {{{
 
 class ToElementAction a act | a -> act where
-  toElementAction :: a -> IO (Element,IO act)
+  toElementAction :: a -> IO (Element,IO act,act -> IO ())
 
 -- }}}
 
 -- ToElementsAction {{{
 
 class ToElementsAction a act | a -> act where
-  toElementsAction :: a -> IO ([Element],IO act)
+  toElementsAction :: a -> IO ([Element],IO act,act -> IO ())
 
 -- }}}
 

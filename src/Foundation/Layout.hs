@@ -3,7 +3,7 @@
 module Foundation.Layout where
 
 import qualified Graphics.UI.Threepenny as UI
-import Graphics.UI.Threepenny.Core
+import Graphics.UI.Threepenny.Core hiding (row)
 import Foundation.Common
 
 import Data.Maybe (catMaybes, isJust)
@@ -38,16 +38,16 @@ widthLarge cs = do
 collapseRow :: [Column a] -> Row a
 collapseRow = Row True
 
-paddedRow :: [Column a] -> Row a
-paddedRow = Row False
+row :: [Column a] -> Row a
+row = Row False
 
 pad :: ToElements a => a -> IO Element
-pad a = toElement $ paddedRow
+pad a = toElement $ row
   [ uniformLayout (centered 11) a
   ]
 
 split :: ToElements a => [(Int,a)] -> IO Element
-split cols = toElement $ paddedRow $ map mkCol cols
+split cols = toElement $ row $ map mkCol cols
   where
   mkCol (width,cnt) = uniformLayout (colWidth width) cnt
 
@@ -81,6 +81,9 @@ instance ToElements a => ToElement (Column a) where
             , maybeWhen True      $ size $ show wid
             ]
       | otherwise = fail $ "Bad column layout: " ++ show l
+
+col :: a -> Column a
+col = uniformLayout (colWidth 12)
 
 stackAlways :: a -> Column a
 stackAlways = Column Nothing Nothing

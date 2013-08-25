@@ -2,7 +2,7 @@
 module Library.Page.PatronInfo where
 
 import qualified Graphics.UI.Threepenny as UI
-import Graphics.UI.Threepenny.Core
+import Graphics.UI.Threepenny.Core hiding (row)
 
 import Foundation.Common
 import Foundation.Input
@@ -24,7 +24,7 @@ import Data.Char (isDigit)
 import Data.List (elemIndex)
 
 type PatronInfo extra
-  =  Element
+  =  (Element,Element)
   -> Connection
   -> PatronFields
   -> String -> String
@@ -35,22 +35,39 @@ type PatronInfo extra
   -> extra
   -> IO ()
 
+type LoadAction = (Element,Element) -> PatronFields -> IO ()
+
 -- Patron Info {{{
 
-patronInfo :: PatronInfo extra
+noLoadAction :: LoadAction
+noLoadAction _ _ = return ()
+
+patronInfo' :: String -> Connection -> PatronInfo () -> LoadAction -> Page
+patronInfo' pg conn buttonAct loadAct = patronInfo pg conn buttonAct () loadAct
+
+patronInfo :: String
            -> Connection
+           -> PatronInfo extra
            -> extra
+           -> LoadAction
            -> Page
-patronInfo validatedAction conn extra = do
-  pf        <- mkPatronFields
+patronInfo pageNm conn buttonAct extra loadAct = do
+  pf        <- mkPatronFields pageNm
   alertArea <- UI.div
+  btnArea   <- UI.div
+  loadAct (alertArea,btnArea) pf
+  let resetFlds = clearPatronFields pf
+  clearBtn  <- toElement $
+    Button (LabelStr "Clear") radiusBtnStyle $ const $
+      resetFlds
   submitBtn <- toElement $ 
-    Button (LabelStr "Submit") radiusBtnStyle $
+    Button (LabelStr "Submit") radiusBtnStyle $ const $ do
       validatePatronFields pf
-        validatedAction
-        alertArea
+        buttonAct
+        (alertArea,btnArea)
         conn
         extra
+      resetFlds
   let renderFld fld = toElement $ fieldContent $ fld pf
   return
     [ renderFld fstNameFld , renderFld lstNameFld
@@ -65,7 +82,13 @@ patronInfo validatedAction conn extra = do
     , pad $
       split
       [ ( 9 , pad $ center #+! element alertArea )
-      , ( 3 , right #+! element submitBtn        )
+      , ( 3 , right #+ 
+                [ element submitBtn
+                , UI.br
+                , element clearBtn
+                , UI.br
+                , element btnArea
+                ])
       ]
     ]
 
@@ -87,8 +110,8 @@ data PatronFields = PatronFields
   , patNumFld  :: Field String
   }
 
-mkPatronFields :: IO PatronFields
-mkPatronFields =
+mkPatronFields :: String -> IO PatronFields
+mkPatronFields pgName =
       PatronFields
   <$> required textField "First Name"
   <*> required textField "Last Name"
@@ -106,7 +129,7 @@ mkPatronFields =
   <*> optional textField "Zip Code"
   <*> optional textField "Patron Number"
   where
-  prefRads = Radios "prefcont" False $ map radOpt
+  prefRads = Radios (pgName ++ "prefcont") False $ map radOpt
     [ "Email"
     , "Phone"
     ]
@@ -132,13 +155,27 @@ required :: (String -> String -> IO (Field a))
          -> IO (Field a)
 required f typ = f typ (typ ++ "*")
 
+clearPatronFields :: PatronFields -> IO ()
+clearPatronFields pf = do
+  setValue (fstNameFld pf) ""
+  setValue (lstNameFld pf) ""
+  setValue (emailFld   pf) ""
+  setValue (phoneFld   pf) ""
+  setValue (prefFld    pf) Nothing
+  setValue (home1Fld   pf) ""
+  setValue (home2Fld   pf) ""
+  setValue (cityFld    pf) ""
+  setValue (stateFld   pf) ""
+  setValue (zipFld     pf) ""
+  setValue (patNumFld  pf) ""
+
 validatePatronFields :: PatronFields
                      -> PatronInfo extra
-                     -> Element
+                     -> (Element,Element)
                      -> Connection
                      -> extra
                      -> IO ()
-validatePatronFields pf validatedFn alertArea conn extra =
+validatePatronFields pf validatedFn (alertArea,btnArea) conn extra =
   validate fstNameFld notNull     $ \fstName ->
   validate lstNameFld notNull     $ \lstName ->
   validate emailFld   emailValid  $ \email   ->
@@ -151,7 +188,7 @@ validatePatronFields pf validatedFn alertArea conn extra =
     home2   <- getValue $ home2Fld pf
     city    <- getValue $ cityFld  pf
     state   <- getValue $ stateFld pf
-    validatedFn alertArea conn pf
+    validatedFn (alertArea,btnArea) conn pf
       fstName lstName
       phone email pref
       home1 home2
@@ -269,7 +306,7 @@ genPatronNum = genPatronNumDigits numDigitsPatron
 
 genPatronNumDigits :: Int -> Connection -> IO Integer
 genPatronNumDigits digits conn = do
-  ns <- getPatronNumbers conn
+  ns <- map fst <$> getPatronNumbers conn
   go ns
   where
   go ns = do
@@ -291,12 +328,8 @@ data Field a = Field
 
 dropdownField :: Dropdown -> String -> String -> IO (Field String)
 dropdownField dd typ lab = do
-  (sel,getVal) <- toElementAction dd
+  (sel,getVal,setVal) <- toElementAction dd
   let opts = map optString $ dropdownOpts dd
-  let setVal o = void $
-    -- (+ 1) because Dropdown adds an empty option at the top.
-    -- If o is not found in the options, then we just reset the dropdown.
-        element sel # set UI.selection ((+ 1) <$> elemIndex o opts)
   return $ Field
     (labeledField lab $ element sel)
     typ
@@ -305,10 +338,7 @@ dropdownField dd typ lab = do
 
 radsField :: ToElements a => Radios a -> String -> String -> IO (Field (Maybe String))
 radsField rs typ lab = do
-  (rads,getVal) <- toElementsAction rs
-  let setVal ms = forM_ rads $ \r -> do
-                    v <- Just <$> get value r
-                    element r # set UI.checked (v == ms)
+  (rads,getVal,setVal) <- toElementsAction rs
   return $ Field
     (labeledField lab $ inlineList $ map element rads)
     typ

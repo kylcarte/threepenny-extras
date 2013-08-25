@@ -13,13 +13,12 @@ import Library.Page.PatronInfo
 import Database.SQLite.Simple
 
 addPatronPage :: Connection -> Page
-addPatronPage conn = patronInfo
+addPatronPage conn = patronInfo' "AddPatron" conn
   addPatronAction
-  conn
-  ()
+  noLoadAction
 
 addPatronAction :: PatronInfo ()
-addPatronAction alertArea conn pf
+addPatronAction (alertArea,btnArea) conn pf
   fstNm lstNm
   phone email pref
   home1 home2
@@ -39,15 +38,16 @@ addPatronAction alertArea conn pf
 
     -- Existing Patron
     Just n  -> do
-      ns <- getPatronNumbers conn
-      if n `elem` ns
-        then do
+      mId <- patronNumberInDB conn n
+      case mId of
+        Just _ -> do
           displayFailure alertArea
             "Patron Number Is Already Taken"
           return Nothing
-        else do
+        Nothing -> do
           displaySuccess alertArea
             "Patron Added!"
+          clearPatronFields pf
           return $ Just n
 
   -- All Set to Go

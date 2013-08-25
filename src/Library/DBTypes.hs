@@ -131,19 +131,6 @@ instance ToField CityStateZip where
 
 -- Patron DB {{{
 
-{-
-  { patronDBId   :: Maybe Integer      -- Maybe, so we can construct Patrons
-  , firstName    :: String               --  and insert them conveniently
-  , lastName     :: String
-  , phoneNumber  :: PhoneNumber
-  , emailAddr    :: Email
-  , prefContact  :: Contact
-  , homeAddr1    :: Addr
-  , homeAddr2    :: Addr
-  , cityStateZip :: CityStateZip
-  , patronNum    :: Integer
--}
-
 checkPatronTable :: Connection -> IO ()
 checkPatronTable conn = do
   res <- query_ conn "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'patrons'"
@@ -187,9 +174,10 @@ getPatrons :: Connection -> IO [Patron]
 getPatrons conn = query_ conn
   "SELECT * FROM patrons"
 
-getPatronNumbers :: Connection -> IO [Integer]
-getPatronNumbers conn = map fromOnly <$> query_ conn
-  "SELECT patronnum FROM patrons"
+-- [(patronNum,patronDBId)]
+getPatronNumbers :: Connection -> IO [(Integer,Integer)]
+getPatronNumbers conn = query_ conn
+  "SELECT patronnum,ID FROM patrons"
 
 deletePatron :: Connection -> Integer -> IO [Patron]
 deletePatron conn idNo = query conn
@@ -221,6 +209,16 @@ searchPatronsEmail :: Connection -> String -> IO [Patron]
 searchPatronsEmail conn x = query conn
   "SELECT * FROM patrons WHERE emailaddr = ?"
   (Only x)
+
+patronNumberInDB :: Connection -> Integer -> IO (Maybe Integer)
+patronNumberInDB conn patNum = do
+  ns <- getPatronNumbers conn
+  return $ lookup patNum ns
+
+patronNumberTaken :: Connection -> Integer -> Integer -> IO Bool
+patronNumberTaken conn idNo patNum =
+      maybe False (not . (idNo ==))
+  <$> patronNumberInDB conn patNum
 
 -- }}}
 

@@ -8,7 +8,7 @@ import Foundation.Common
 
 import Library.DBTypes
 import Library.Page.AddPatron
-import Library.Page.PatronSearch
+import Library.Page.EditPatron
 
 import Database.SQLite.Simple
 
@@ -33,8 +33,8 @@ mainPage conn = collapseRow
   [ stackOnSmall (centered 10) $
     toElement $
     Sections "Tabs" Tabs
-      [ ( LabelStr "Add Patron"    , addPatronPage conn )
-      , ( LabelStr "Patron Search" , patronSearch  conn )
+      [ ( LabelStr "Add Patron"    , addPatronPage  conn )
+      , ( LabelStr "Edit Patron" , editPatronPage conn )
       ]
   ]
 

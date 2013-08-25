@@ -9,6 +9,7 @@ import Foundation.Common
 
 import Control.Applicative
 import Control.Monad
+import Data.List (elemIndex)
 import Data.Maybe (catMaybes)
 
 -- ButtonGroup {{{
@@ -43,14 +44,14 @@ instance ToElement ButtonGroup where
 data Button = Button
   { buttonLabel  :: Label
   , buttonStyle  :: ButtonStyle
-  , buttonAction :: IO ()
+  , buttonAction :: Element -> IO ()
   }
 
 instance ToElement Button where
   toElement (Button lbl s act) = do
     lbl' <- toElements lbl
     but <- UI.button # set classes ("button" : buttonClasses s) #+ map element lbl'
-    on UI.click but $ const act
+    on UI.click but $ const $ act but
     element but
 
 plainBtnStyle :: ButtonStyle
@@ -118,7 +119,13 @@ instance ToElementAction Dropdown String where
     sel <- UI.select # set UI.id_ (dropdownId d) #+ map toElement
              ((if dropdownBlankDef d then (opt "" :) else id) $
               dropdownOpts d)
-    return (sel, get value sel)
+    let getVal = get value sel
+    let setVal s = void $ element sel # set value s
+    {-void $ element sel #
+                     set UI.selection
+                       ((+ 1) <$> elemIndex s (map optString $ dropdownOpts d))
+                       -}
+    return (sel,getVal,setVal)
 
 -- Option
 
@@ -160,6 +167,9 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
   toElementsAction (Radios nm fstChkd (r:rs)) = do
     (r',v)   <- mkOption fstChkd (r,0)
     (rs',vs) <- fmap unzip $ mapM (mkOption False) $ zip rs [1..]
+    let setVal ms = forM_ (r':rs') $ \rad -> do
+                      v <- Just <$> get value rad
+                      void $ element rad # set UI.checked (v == ms)
     let getVal = do vals <- fmap catMaybes $ forM (r':rs') $ \rad -> do
                       chkd <- get UI.checked rad
                       if chkd
@@ -169,7 +179,7 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
                       [x] -> return $ Just x
                       []  -> return Nothing
                       _   -> fail $ "More than one radio button checked??: " ++ show vals
-    return (v:vs,getVal)
+    return (v:vs,getVal,setVal)
     where
     mkOption :: ToElements a => Bool -> ((a,String),Integer) -> IO (Element,Element)
     mkOption chkd ((a,val),i) = do
@@ -205,12 +215,16 @@ instance ToElements a => ToElementsAction (Checkboxes a) [String] where
   toElementsAction (Checkboxes nm (c:cs)) = do
     (c',v)   <- mkOption c
     (cs',vs) <- fmap unzip $ mapM mkOption cs
+    let setVal ss = forM_ (c':cs') $ \cbx -> do
+                      v <- get value cbx
+                      when (v `elem` ss) $ void $
+                        element cbx # set UI.checked True
     let getVal = fmap catMaybes $ forM (c':cs') $ \cbx -> do
                    chkd <- get UI.checked cbx
                    if chkd
                      then Just <$> get value cbx
                      else return Nothing
-    return (v:vs,getVal)
+    return (v:vs,getVal,setVal)
     where
     mkOption (a,val,chkd) = do
       inp <- UI.input #*
