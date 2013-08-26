@@ -28,8 +28,8 @@ viewPatronInfo (drawArea,btnArea) conn
       Button (LabelStr "Back")
         (alertBtn radiusBtnStyle) $ \self -> do
         delete self
-        displayPatronTable' (drawArea,btnArea) searchResults
-          conn viewPatronInfo
+        displayPatronTable' (drawArea,btnArea) conn
+          searchResults viewPatronInfo
     pInf <- patronInfo "ViewPatronInfo" conn
               editPatronAction (patronDBId pat)
               (loadPatronFields backBtn btnArea pat)

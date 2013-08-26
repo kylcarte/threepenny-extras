@@ -8,8 +8,6 @@ import Foundation.Common
 
 -- Sections {{{
 
-type Page = IO [IO Element]
-
 data Sections a = Sections
   { sectionName :: String
   , sectionType :: SectionType

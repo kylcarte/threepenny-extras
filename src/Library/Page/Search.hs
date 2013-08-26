@@ -7,9 +7,8 @@ import Graphics.UI.Threepenny.Core hiding (row)
 import Foundation.Common
 import Foundation.Input
 import Foundation.Layout
-import Foundation.Sections (Page)
 
-import Library.Page.PatronInfo
+import Library
 
 import Database.SQLite.Simple
 
@@ -22,13 +21,13 @@ type Search search extra =
   -> extra             -- whatever else is needed
   -> IO ()
 
-search :: [(String,String -> IO (Either String [s]))] -- Search Options/Actions
-       -> String                                      -- Page Name
+search :: String                                      -- Page Name
        -> Connection                                  -- DB Connection
        -> Search s extra                              -- Search Results Action
        -> extra                                       --   and extra info
+       -> [(String,String -> IO (Either String [s]))] -- Search Options/Actions
        -> Page
-search searchOpts pageNm conn searchFn extra = do
+search pageNm conn searchFn extra searchOpts = do
   searchTypeFld <- optional (radsField searchRads) "Search By"
   searchFld     <- optional textField ""
   resArea       <- UI.div

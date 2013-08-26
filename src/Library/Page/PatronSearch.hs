@@ -5,12 +5,10 @@ import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core hiding (row)
 
 import Foundation.Common
-import Foundation.Input
-import Foundation.Layout
-import Foundation.Sections (Page)
 
+import Library
 import Library.DBTypes
-import Library.Page.PatronInfo
+import Library.Page.Search
 
 import Database.SQLite.Simple
 
@@ -27,154 +25,35 @@ type PatronSearch extra =
 
 -- Patron Search {{{
 
-type Search search extra = 
-     (Element,Element) -- drawArea, buttonArea
-  -> Connection        -- DB Connection
-  -> [search]          -- search results (for "Back", etc.)
-  -> extra             -- whatever else is needed
-  -> IO ()
-
-search :: [(String,String -> IO (Either String [s]))]
-       -> String
-       -> Connection
-       -> Search s extra
-       -> extra
-       -> Page
-search searchOpts pageNm conn searchFn extra = do
-  searchTypeFld <- optional (radsField searchRads) "Search By"
-  searchFld     <- optional textField ""
-  resArea       <- UI.div
-  btnArea       <- UI.div
-  let resetFlds = do setValue searchTypeFld (radioDefault searchRads)
-                     setValue searchFld     ""
-  clearBtn      <- toElement $
-    Button (LabelStr "Clear") (secondaryBtn radiusBtnStyle) $ const $ void $
-      do resetFlds
-         element resArea # set children []
-  searchBtn     <- toElement $
-    Button (LabelStr "Search") radiusBtnStyle $ const $
-      do sTerm <- getValue searchFld
-         if null sTerm
-           then displayFailure resArea "You must enter a search term"
-           else do
-             msType <- getValue searchTypeFld
-             case msType of
-               Nothing -> displayFailure resArea "Select a search type"
-               Just sType -> do
-                 resetFlds
-                 let go [] = fail $ "Bug: Bad Search Type: " ++ show sType
-                     go ((typ,act):rest) = if typ /= sType
-                       then go rest
-                       else act sTerm
-                 sRes <- go searchOpts
-                 case sRes of
-                   Left err -> displayFailure resArea err
-                   Right rs -> searchFn (resArea,btnArea) conn rs extra
-
-  let renderFld = toElement . fieldContent
-  return
-    [ renderFld searchTypeFld
-    , renderFld searchFld
-    , pad $
-      split
-      [ ( 9 , pad $ center #+! element resArea )
-      , ( 3 , right #+
-                [ element searchBtn
-                , UI.br
-                , element clearBtn
-                , UI.br
-                , element btnArea
-                ])
-      ]
-    ]
-  where
-  searchRads = Radios
-    (pageNm ++ "searchOptions")
-    (Just $ fst $ head searchOpts)
-    (map (radOpt . fst) searchOpts)
-
 patronSearch' :: String -> Connection -> PatronSearch () -> Page
 patronSearch' pg conn act = patronSearch pg conn act ()
 
 patronSearch :: String -> Connection -> PatronSearch extra -> extra -> Page
-patronSearch pageNm conn infoFn extra = do
-  searchTypeFld <- optional (radsField searchRads) "Search By"
-  searchFld     <- optional textField ""
-  resArea       <- UI.div
-  btnArea       <- UI.div
-  let resetFlds = do setValue searchTypeFld (radioDefault searchRads)
-                     setValue searchFld     ""
-  clearBtn      <- toElement $
-    Button (LabelStr "Clear") (secondaryBtn radiusBtnStyle) $ const $ void $
-      do resetFlds
-         element resArea # set children []
-  searchBtn     <- toElement $
-    Button (LabelStr "Search") radiusBtnStyle $ const $
-      do sTerm <- getValue searchFld
-         if null sTerm
-           then displayFailure resArea "You must enter a search term"
-           else do
-             sType <- getValue searchTypeFld
-             resetFlds
-             sRes <- case sType of
-               Just "Patron Number" -> case patNumValid sTerm of
-                                         Right (Just n) -> Right
-                                           <$> searchPatronsNum conn n
-                                         _ -> return $ Left
-                                                "Patron Number is malformed"
-               Just "Last Name"     -> Right <$> searchPatronsLastName conn sTerm
-               Just "Email Address" -> case emailValid sTerm of
-                                         Right e -> Right
-                                           <$> searchPatronsEmail conn e
-                                         _ -> return $ Left "Email is malformed"
-               _ -> fail $ "Bug: Bad Search Type: " ++ show sType
-             case sRes of
-               Left err -> displayFailure resArea err
-               Right ps -> displayPatronTable (resArea,btnArea) ps conn infoFn extra
-
-  let renderFld = toElement . fieldContent
-  return
-    [ renderFld searchTypeFld
-    , renderFld searchFld
-    , pad $
-      split
-      [ ( 9 , pad $ center #+! element resArea )
-      , ( 3 , right #+
-                [ element searchBtn
-                , UI.br
-                , element clearBtn
-                , UI.br
-                , element btnArea
-                ])
-      ]
-    ]
+patronSearch pageNm conn infoFn extra = search pageNm conn searchFn extra
+  [ ( "Patron Number" , \sTerm -> case patNumValid sTerm of
+                                    Right (Just n) -> Right
+                                      <$> searchPatronsNum conn n
+                                    _ -> return $ Left
+                                           "Patron Number is malformed" )
+  , ( "Last Name"     , \sTerm -> Right <$> searchPatronsLastName conn sTerm )
+  , ( "Email Address" , \sTerm -> case emailValid sTerm of
+                                    Right e -> Right
+                                      <$> searchPatronsEmail conn e
+                                    _ -> return $ Left "Email is malformed" )
+  ]
   where
-  searchRads = Radios (pageNm ++ "searchOptions") (Just "Patron Number") $ map radOpt
-    [ "Patron Number"
-    , "Last Name"
-    , "Email Address"
-    ]
+  searchFn es c ps x = displayPatronTable es c ps (infoFn,x)
 
 -- }}}
 
 -- Display Patron Table {{{
 
-displayPatronTable' ::
-     (Element,Element)
-  -> [Patron]
-  -> Connection
-  -> PatronSearch ()
-  -> IO ()
+displayPatronTable' :: Search Patron (PatronSearch ())
 displayPatronTable' es ps conn act =
-  displayPatronTable es ps conn act ()
+  displayPatronTable es ps conn (act,())
 
-displayPatronTable :: (Element,Element)
-                   -> [Patron]
-                   -> Connection
-                   -> PatronSearch extra
-                   -> extra
-                   -> IO ()
-displayPatronTable (drawArea,btnArea) ps conn infoFn extra = void $ do
+displayPatronTable :: Search Patron (PatronSearch extra,extra)
+displayPatronTable (drawArea,btnArea) conn ps (infoFn,extra) = void $ do
   tbl <- UI.table # set widthPerc "100" #+
            [ thead #+! tableHdr
            , tbody #+ map tableRow ps
