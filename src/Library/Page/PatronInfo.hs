@@ -21,7 +21,6 @@ import System.Random hiding (split)
 import Control.Applicative hiding (optional)
 import Control.Monad
 import Data.Char (isDigit)
-import Data.List (elemIndex)
 
 type PatronInfo extra
   =  (Element,Element)
@@ -35,21 +34,21 @@ type PatronInfo extra
   -> extra
   -> IO ()
 
-type LoadAction = (Element,Element) -> PatronFields -> IO ()
+type PatronInfoLoad = (Element,Element) -> PatronFields -> IO ()
 
 -- Patron Info {{{
 
-noLoadAction :: LoadAction
+noLoadAction :: PatronInfoLoad
 noLoadAction _ _ = return ()
 
-patronInfo' :: String -> Connection -> PatronInfo () -> LoadAction -> Page
+patronInfo' :: String -> Connection -> PatronInfo () -> PatronInfoLoad -> Page
 patronInfo' pg conn buttonAct loadAct = patronInfo pg conn buttonAct () loadAct
 
 patronInfo :: String
            -> Connection
            -> PatronInfo extra
            -> extra
-           -> LoadAction
+           -> PatronInfoLoad
            -> Page
 patronInfo pageNm conn buttonAct extra loadAct = do
   pf        <- mkPatronFields pageNm
@@ -58,7 +57,7 @@ patronInfo pageNm conn buttonAct extra loadAct = do
   loadAct (alertArea,btnArea) pf
   let resetFlds = clearPatronFields pf
   clearBtn  <- toElement $
-    Button (LabelStr "Clear") radiusBtnStyle $ const $
+    Button (LabelStr "Clear") (secondaryBtn radiusBtnStyle) $ const $
       resetFlds
   submitBtn <- toElement $ 
     Button (LabelStr "Submit") radiusBtnStyle $ const $ do
@@ -67,7 +66,6 @@ patronInfo pageNm conn buttonAct extra loadAct = do
         (alertArea,btnArea)
         conn
         extra
-      resetFlds
   let renderFld fld = toElement $ fieldContent $ fld pf
   return
     [ renderFld fstNameFld , renderFld lstNameFld
@@ -129,7 +127,7 @@ mkPatronFields pgName =
   <*> optional textField "Zip Code"
   <*> optional textField "Patron Number"
   where
-  prefRads = Radios (pgName ++ "prefcont") False $ map radOpt
+  prefRads = Radios (pgName ++ "prefcont") Nothing $ map radOpt
     [ "Email"
     , "Phone"
     ]
@@ -329,7 +327,6 @@ data Field a = Field
 dropdownField :: Dropdown -> String -> String -> IO (Field String)
 dropdownField dd typ lab = do
   (sel,getVal,setVal) <- toElementAction dd
-  let opts = map optString $ dropdownOpts dd
   return $ Field
     (labeledField lab $ element sel)
     typ

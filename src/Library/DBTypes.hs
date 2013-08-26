@@ -6,7 +6,9 @@ import Database.SQLite.Simple
 import Database.SQLite.Simple.FromField
 import Database.SQLite.Simple.ToField
 import Database.SQLite.Simple.Ok
-import Data.Time.Calendar
+
+import Data.Time
+import System.Locale
 
 import System.Directory
 import System.Exit
@@ -30,7 +32,7 @@ initDB fp = do
   conn <- open fp
   checkPatronTable conn
   checkAlertTable conn
-  checkItemTable conn
+  checkCheckOutTable conn
   return conn
 
 -- Patron {{{
@@ -289,92 +291,110 @@ searchAlertsPatron conn x = query conn
 
 
 
--- Item {{{
+-- TimeStamp {{{
 
-data Item = Item
-  { itemId  :: Maybe Integer
-  , dueDate :: Date
-  , patron  :: Integer
-  , title   :: Maybe String
+newtype TimeStamp = TimeStamp
+  { timeStamp :: UTCTime
   } deriving (Eq,Show)
 
-instance FromRow Item where
-  fromRow = Item
-        <$> (Just <$> field) -- itemId
-        <*> field            -- dueDate
-        <*> field            -- patron (id)
-        <*> field            -- title
+dbTimeFormat :: String
+dbTimeFormat = "%m %d %C%Y %H %M"
 
-mkItem :: Date -> Integer -> Maybe String -> Item
-mkItem = Item Nothing
+instance ToField TimeStamp where
+  toField =
+    toField .
+    formatTime defaultTimeLocale dbTimeFormat .
+    timeStamp
 
--- Avoiding Orphan instances by wrapping in a newtype
-newtype Date = Date { toDay :: Day } deriving (Eq,Ord,Show)
-
-instance ToField Date where
-  toField = toField . toModifiedJulianDay . toDay
-
-instance FromField Date where
-  fromField f = Date . ModifiedJulianDay <$> fromField f
+instance FromField TimeStamp where
+  fromField f = do
+    txt <- fromField f
+    let mt = parseTime
+               defaultTimeLocale
+               dbTimeFormat
+               txt
+    case mt of
+      Nothing -> fail $ "Malformed UTCTime: " ++ txt
+      Just t  -> return $ TimeStamp t
 
 -- }}}
 
--- Item DB {{{
+-- CheckOut {{{
 
-checkItemTable :: Connection -> IO ()
-checkItemTable conn = do
-  res <- query_ conn "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'items'"
+data CheckOut = CheckOut
+  { checkOutDBId      :: Maybe Integer
+  , checkOutPatronId  :: Integer
+  , checkOutBookId    :: Integer
+  , checkOutTimeStamp :: TimeStamp
+  } deriving (Eq,Show)
+
+instance FromRow CheckOut where
+  fromRow = CheckOut
+        <$> (Just <$> field) -- checkOutDBId
+        <*> field            -- checkOutPatronId
+        <*> field            -- checkOutBookId
+        <*> field            -- checkOutTimeStamp
+
+mkCheckOut :: Integer -> Integer -> TimeStamp -> CheckOut
+mkCheckOut = CheckOut Nothing
+
+-- }}}
+
+-- CheckOut DB {{{
+
+checkCheckOutTable :: Connection -> IO ()
+checkCheckOutTable conn = do
+  res <- query_ conn "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'checkouts'"
   when (null (res :: [Only String])) $ do
-    putStrLn "Creating checked out items table."
+    putStrLn "Creating checkouts table."
     execute_ conn
-      "CREATE TABLE items (ID INTEGER PRIMARY KEY, duedate TEXT NOT NULL, patron INTEGER NOT NULL, title TEXT)"
+      "CREATE TABLE checkouts (ID INTEGER PRIMARY KEY, patronid INTEGER NOT NULL, bookid INTEGER NOT NULL, timestamp TEXT NOT NULL)"
 
-insertItem :: Connection -> Item -> IO ()
-insertItem conn i = execute conn
-  "INSERT INTO items VALUES (null, ?, ?, ?)"
-  ( dueDate i
-  , patron  i
-  , title   i
+insertCheckOut :: Connection -> CheckOut -> IO ()
+insertCheckOut conn c = execute conn
+  "INSERT INTO checkouts VALUES (null, ?, ?, ?)"
+  ( checkOutPatronId  c
+  , checkOutBookId    c
+  , checkOutTimeStamp c
   )
 
-getItems :: Connection -> IO [Item]
-getItems conn = query_ conn
-  "SELECT * FROM items"
+getCheckOuts :: Connection -> IO [CheckOut]
+getCheckOuts conn = query_ conn
+  "SELECT * FROM checkouts"
 
-deleteItem :: Connection -> Integer -> IO [Item]
-deleteItem conn idNo = query conn
-  "DELETE FROM items where ID = ?"
+deleteCheckOut :: Connection -> Integer -> IO [CheckOut]
+deleteCheckOut conn idNo = query conn
+  "DELETE FROM checkouts where ID = ?"
   (Only idNo)
 
--- ALL MATCH METHODS TAKE STRINGS
-matchItemsTitle :: Connection -> String -> IO [Item]
-matchItemsTitle conn x = query conn
-  "SELECT * FROM items WHERE title LIKE ?"
-  (Only $ concat ["%",x,"%"])
+matchCheckOutsMonthDayYear :: Connection -> (Integer,Integer,Integer) -> IO [CheckOut]
+matchCheckOutsMonthDayYear conn mdy = do
+  cs <- map parseInfo <$> getCheckOuts conn
+  return $
+    map snd $
+    filter ((== mdy) . fst) cs
+  where
+  parseInfo c = (parseMDY c,c)
+  parseMDY = parseTimeFields . formatTimeStamp . checkOutTimeStamp
+  formatTimeStamp = formatTime defaultTimeLocale "%m%d%C%Y" . timeStamp
+  parseTimeFields :: String -> (Integer,Integer,Integer)
+  parseTimeFields l@[m1,m2,d1,d2,y1,y2,y3,y4]
+    | all isDigit l = (read [m1,m2],read [d1,d2],read [y1,y2,y3,y4])
+  parseTimeFields s = error $ "Bad time string? " ++ s
 
-matchItemsDate :: Connection -> String -> IO [Item]
-matchItemsDate conn x = query conn
-  "SELECT * FROM items WHERE duedate LIKE ?"
-  (Only $ concat ["%",x,"%"])
-
-matchItemsPatron :: Connection -> String -> IO [Item]
-matchItemsPatron conn x = query conn
-  "SELECT * FROM items WHERE patron LIKE ?"
-  (Only $ concat ["%",x,"%"])
-
-searchItemsId :: Connection -> Integer -> IO [Item]
-searchItemsId conn x = query conn
-  "SELECT * FROM items WHERE ID = ?"
+searchCheckOutsId :: Connection -> Integer -> IO [CheckOut]
+searchCheckOutsId conn x = query conn
+  "SELECT * FROM checkouts WHERE ID = ?"
   (Only x)
 
-searchItemsDate :: Connection -> Date -> IO [Item]
-searchItemsDate conn x = query conn
-  "SELECT * FROM items WHERE duedate = ?"
+searchCheckOutsPatronId :: Connection -> Integer -> IO [CheckOut]
+searchCheckOutsPatronId conn x = query conn
+  "SELECT * FROM checkouts WHERE patronid = ?"
   (Only x)
 
-searchItemsPatron :: Connection -> Integer -> IO [Item]
-searchItemsPatron conn x = query conn
-  "SELECT * FROM items WHERE patron = ?"
+searchCheckOutsBookId :: Connection -> Integer -> IO [CheckOut]
+searchCheckOutsBookId conn x = query conn
+  "SELECT * FROM checkouts WHERE bookid = ?"
   (Only x)
 
 -- }}}

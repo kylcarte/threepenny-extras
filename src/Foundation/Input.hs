@@ -9,7 +9,6 @@ import Foundation.Common
 
 import Control.Applicative
 import Control.Monad
-import Data.List (elemIndex)
 import Data.Maybe (catMaybes)
 
 -- ButtonGroup {{{
@@ -90,6 +89,15 @@ data ButtonStyle = ButtonStyle
   , buttonDisabled :: Bool
   }
 
+alertBtn :: ButtonStyle -> ButtonStyle
+alertBtn bs = bs { buttonColor = Just BtnAlert }
+
+successBtn :: ButtonStyle -> ButtonStyle
+successBtn bs = bs { buttonColor = Just BtnSuccess }
+
+secondaryBtn :: ButtonStyle -> ButtonStyle
+secondaryBtn bs = bs { buttonColor = Just BtnSecondary }
+
 data ButtonSize
   = BtnTiny
   | BtnSmall
@@ -155,7 +163,7 @@ enableOption o = o { optDisabled = False }
 
 data Radios a = Radios
   { radioName       :: String
-  , radioFstChecked :: Bool
+  , radioDefault    :: Maybe String
   , radioOptions    :: [(a,String)]
   }
 
@@ -164,12 +172,12 @@ radOpt s = (string s, s)
 
 instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
   toElementsAction (Radios _ _ []) = fail "Empty Radio Options"
-  toElementsAction (Radios nm fstChkd (r:rs)) = do
-    (r',v)   <- mkOption fstChkd (r,0)
-    (rs',vs) <- fmap unzip $ mapM (mkOption False) $ zip rs [1..]
+  toElementsAction (Radios nm mdef (r:rs)) = do
+    (r',v)   <- mkOption (r,0)
+    (rs',vs) <- fmap unzip $ mapM mkOption $ zip rs [1..]
     let setVal ms = forM_ (r':rs') $ \rad -> do
-                      v <- Just <$> get value rad
-                      void $ element rad # set UI.checked (v == ms)
+                      mv <- Just <$> get value rad
+                      void $ element rad # set UI.checked (mv == ms)
     let getVal = do vals <- fmap catMaybes $ forM (r':rs') $ \rad -> do
                       chkd <- get UI.checked rad
                       if chkd
@@ -181,15 +189,15 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
                       _   -> fail $ "More than one radio button checked??: " ++ show vals
     return (v:vs,getVal,setVal)
     where
-    mkOption :: ToElements a => Bool -> ((a,String),Integer) -> IO (Element,Element)
-    mkOption chkd ((a,val),i) = do
+    mkOption :: ToElements a => ((a,String),Integer) -> IO (Element,Element)
+    mkOption ((a,val),i) = do
       let idStr = nm ++ show i
       inp <- UI.input #*
                [ set UI.name nm
                , set UI.type_ "radio"
                , set UI.id_ idStr
                , set value val
-               , set checked chkd
+               , set checked (mdef == Just val)
                ]
       cts <- toElements a
       lab <- label #
@@ -206,18 +214,19 @@ instance ToElements a => ToElementsAction (Radios a) (Maybe String) where
 -- Checkboxes {{{
 
 data Checkboxes a = Checkboxes
-  { checkboxName    :: String
-  , checkboxOptions :: [(a,String,Bool)]
+  { checkboxName     :: String
+  , checkboxDefaults :: [String]
+  , checkboxOptions  :: [(a,String)]
   }
 
 instance ToElements a => ToElementsAction (Checkboxes a) [String] where
-  toElementsAction (Checkboxes _ []) = fail "Empty Checkbox Options"
-  toElementsAction (Checkboxes nm (c:cs)) = do
+  toElementsAction (Checkboxes _ _ []) = fail "Empty Checkbox Options"
+  toElementsAction (Checkboxes nm defs (c:cs)) = do
     (c',v)   <- mkOption c
     (cs',vs) <- fmap unzip $ mapM mkOption cs
     let setVal ss = forM_ (c':cs') $ \cbx -> do
-                      v <- get value cbx
-                      when (v `elem` ss) $ void $
+                      mv <- get value cbx
+                      when (mv `elem` ss) $ void $
                         element cbx # set UI.checked True
     let getVal = fmap catMaybes $ forM (c':cs') $ \cbx -> do
                    chkd <- get UI.checked cbx
@@ -226,7 +235,8 @@ instance ToElements a => ToElementsAction (Checkboxes a) [String] where
                      else return Nothing
     return (v:vs,getVal,setVal)
     where
-    mkOption (a,val,chkd) = do
+    mkOption (a,val) = do
+      let chkd = val `elem` defs
       inp <- UI.input #*
                [ set UI.name nm
                , set UI.type_ "checkbox"

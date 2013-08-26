@@ -26,11 +26,7 @@ viewPatronInfo (drawArea,btnArea) conn
   _ = void $ do
     backBtn <- toElement $
       Button (LabelStr "Back")
-        (ButtonStyle
-           Nothing
-           (Just BtnAlert)
-           (Just BtnRadius)
-           False) $ \self -> do
+        (alertBtn radiusBtnStyle) $ \self -> do
         delete self
         displayPatronTable' (drawArea,btnArea) searchResults
           conn viewPatronInfo
@@ -40,7 +36,7 @@ viewPatronInfo (drawArea,btnArea) conn
     element drawArea # set children [] #+
       [ panel #+ pInf ]
 
-loadPatronFields :: Element -> Element -> Patron -> LoadAction
+loadPatronFields :: Element -> Element -> Patron -> PatronInfoLoad
 loadPatronFields btn btnArea pat _ pf = do
   element btnArea #+ [ element btn ]
   setValue (fstNameFld pf) $ firstName   pat
