@@ -197,10 +197,16 @@ matchPatronsLastName conn x = query conn
   "SELECT * FROM patrons WHERE lastname LIKE ?"
   (Only $ concat ["%",x,"%"])
 
-searchPatronsNum :: Connection -> Integer -> IO [Patron]
-searchPatronsNum conn x = query conn
-  "SELECT * FROM patrons WHERE patronnum = ?"
-  (Only x)
+-- There should be at most one patron with a given number
+searchPatronsNumber :: Connection -> Integer -> IO (Maybe Patron)
+searchPatronsNumber conn x = do
+  ps <- query conn
+          "SELECT * FROM patrons WHERE patronnum = ?"
+          (Only x)
+  case ps of
+    [] -> return Nothing
+    [p] -> return $ Just p
+    _   -> fail $ "Bug: more than one patron with number " ++ show x
 
 searchPatronsLastName :: Connection -> String -> IO [Patron]
 searchPatronsLastName conn x = query conn
@@ -367,8 +373,8 @@ deleteCheckOut conn idNo = query conn
   "DELETE FROM checkouts where ID = ?"
   (Only idNo)
 
-matchCheckOutsMonthDayYear :: Connection -> (Integer,Integer,Integer) -> IO [CheckOut]
-matchCheckOutsMonthDayYear conn mdy = do
+matchCheckOutsMDY :: Connection -> (Integer,Integer,Integer) -> IO [CheckOut]
+matchCheckOutsMDY conn mdy = do
   cs <- map parseInfo <$> getCheckOuts conn
   return $
     map snd $
@@ -391,6 +397,16 @@ searchCheckOutsPatronId :: Connection -> Integer -> IO [CheckOut]
 searchCheckOutsPatronId conn x = query conn
   "SELECT * FROM checkouts WHERE patronid = ?"
   (Only x)
+
+searchCheckOutsPatronNum :: Connection -> Integer -> IO [CheckOut]
+searchCheckOutsPatronNum conn x = do
+  mp <- searchPatronsNumber conn x
+  case mp of
+    Nothing -> return []
+    Just p  -> case patronDBId p of
+      Nothing -> fail $ "Bug: Patron retrieved from DB has no Id: "
+                   ++ show (patronNum p)
+      Just pn -> searchCheckOutsPatronId conn pn
 
 searchCheckOutsBookId :: Connection -> Integer -> IO [CheckOut]
 searchCheckOutsBookId conn x = query conn

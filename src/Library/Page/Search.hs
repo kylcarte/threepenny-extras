@@ -21,6 +21,8 @@ type Search search extra =
   -> extra             -- whatever else is needed
   -> IO ()
 
+-- TODO: nicely handle single searchOpts (don't use radio buttons)
+
 search :: String                                      -- Page Name
        -> Connection                                  -- DB Connection
        -> Search s extra                              -- Search Results Action

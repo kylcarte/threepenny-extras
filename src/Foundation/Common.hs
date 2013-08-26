@@ -46,8 +46,6 @@ foundationGUI c f = startGUI c $ \w -> void $ do
     [ script # set UI.src "/static/js/foundation.min.js"
     , script # set UI.src "/static/js/foundation.forms.js"
     , script #~ "$(document).foundation();"
-    -- , script # set UI.src "/static/js/zepto.js"
-    -- , script #~ "document.write('<script src=js/' + ('__proto__' in {} ? 'zepto' : 'jquery') + '.js><\\/script>')"
     ]
 
 -- Label {{{
@@ -286,6 +284,9 @@ maybeWhen b a = if b then Just a else Nothing
 
 whenJust :: (Monad m) => Maybe a -> (a -> m ()) -> m ()
 whenJust m f = maybe (return ()) f m
+
+forMaybe :: Maybe a -> b -> (a -> b) -> b
+forMaybe m b f = maybe b f m
 
 -- }}}
 

@@ -97,10 +97,14 @@ required f typ = f typ (typ ++ "*")
 -- Input Validation {{{
 
 type Validate a = Either String a
-vdtFail :: String -> Validate a
-vdtFail = Left
 vdtSucc :: a -> Validate a
 vdtSucc = Right
+
+failMissing :: Validate a
+failMissing = Left "Missing"
+
+failMalformed :: Validate a
+failMalformed = Left "Malformed"
 
 validateWithArea :: Element -> Field a -> (a -> Validate res) -> (res -> IO ()) -> IO ()
 validateWithArea e fld test onSuccess = do
@@ -112,26 +116,26 @@ validateWithArea e fld test onSuccess = do
 -- Names
 notNull :: String -> Validate String
 notNull s
-  | null s   = vdtFail "Missing"
+  | null s   = failMissing
   | otherwise = vdtSucc s
 
 -- Email
 emailValid :: String -> Validate String
-emailValid em = if null em
-  then vdtFail "Missing"
-  else case parseEmail em of
-         Left _  -> vdtFail "Malformed"
-         Right _ -> vdtSucc em
+emailValid em
+  | null em = failMissing
+  | otherwise = case parseEmail em of
+      Left _  -> failMalformed
+      Right _ -> vdtSucc em
   where
   parseEmail = P.parse P.addr_spec ""
 
 -- Phone Number
 phoneValid :: String -> Validate String
 phoneValid ph
-  | null ph = vdtFail "Missing"
+  | null ph = failMissing
   | all (\c -> isDigit c || elem c phoneAcceptableNonDigits) ph
     = vdtSucc $ filter isDigit ph
-  | otherwise = vdtFail "Malformed"
+  | otherwise = failMalformed
 
 phoneAcceptableNonDigits :: String
 phoneAcceptableNonDigits = " ()-"
@@ -145,14 +149,14 @@ zipValid zp
     zp !! 5 == '-' && 
     all isDigit (take 5 zp) &&
     all isDigit (take 4 $ reverse zp) = vdtSucc $ take 5 zp
-  | otherwise = vdtFail "Malformed"
+  | otherwise = failMalformed
 
 -- Preferred Contact
 havePref :: Maybe String -> Validate Contact
 havePref (Just "Email") = vdtSucc Email
 havePref (Just "Phone") = vdtSucc Phone
-havePref (Just _)       = vdtFail "Malformed"
-havePref Nothing        = vdtFail "Missing"
+havePref (Just _)       = failMalformed
+havePref Nothing        = failMissing
 
 -- Patron Number
 patNumValid :: String -> Validate (Maybe Integer)
@@ -160,7 +164,16 @@ patNumValid n
   | null n    = vdtSucc Nothing
   | length n == numDigitsPatron && all isDigit n
               = vdtSucc $ Just $ read n
-  | otherwise = vdtFail "Malformed"
+  | otherwise = failMalformed
+
+-- MM/DD/YYYY
+mdyValid :: String -> Validate (Integer,Integer,Integer)
+mdyValid [m1,m2,'/',d1,d2,'/',y1,y2,y3,y4]
+  | all isDigit [m1,m2,d1,d2,y1,y2,y3,y4]
+    = return (read [m1,m2],read [d1,d2],read [y1,y2,y3,y4])
+  | otherwise = failMalformed
+mdyValid "" = failMissing
+mdyValid _  = failMalformed
 
 -- }}}
 
