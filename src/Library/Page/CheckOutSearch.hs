@@ -7,7 +7,7 @@ import Graphics.UI.Threepenny.Core hiding (row)
 import Foundation.Common
 
 import Library
-import Library.DBTypes
+import Library.DB.Types
 import Library.Page.Search
 
 import Database.SQLite.Simple

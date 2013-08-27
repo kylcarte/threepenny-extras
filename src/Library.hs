@@ -8,7 +8,7 @@ import Foundation.Common
 import Foundation.Input
 import Foundation.Layout
 
-import Library.DBTypes
+import Library.DB.Types
 
 import qualified Text.Parsec as P
 import qualified Text.ParserCombinators.Parsec.Rfc2822 as P

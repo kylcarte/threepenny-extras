@@ -6,9 +6,9 @@ import Graphics.UI.Threepenny.Core hiding (row)
 import Foundation.Common
 import Foundation.Input
 import Foundation.Layout
-import Foundation.Sections (Page)
 
-import Library.DBTypes
+import Library
+import Library.DB.Types
 import Library.Page.PatronInfo
 import Library.Page.PatronSearch
 

@@ -7,13 +7,14 @@ import Graphics.UI.Threepenny.Core hiding (row)
 import Foundation.Common
 
 import Library
-import Library.DBTypes
+import Library.DB.Types
 import Library.Page.Search
 
 import Database.SQLite.Simple
 
 import Control.Applicative hiding (optional)
 import Control.Monad
+import Data.Maybe (maybeToList)
 
 type PatronSearch extra = 
      (Element,Element) -- drawArea, buttonArea
@@ -31,8 +32,8 @@ patronSearch' pg conn act = patronSearch pg conn act ()
 patronSearch :: String -> Connection -> PatronSearch extra -> extra -> Page
 patronSearch pageNm conn infoFn extra = search pageNm conn searchFn extra
   [ ( "Patron Number" , \sTerm -> case patNumValid sTerm of
-                                    Right (Just n) -> Right
-                                      <$> searchPatronsNum conn n
+                                    Right (Just n) -> (Right . maybeToList)
+                                      <$> searchPatronsNumber conn n
                                     _ -> return $ Left
                                            "Patron Number is malformed" )
   , ( "Last Name"     , \sTerm -> Right <$> searchPatronsLastName conn sTerm )

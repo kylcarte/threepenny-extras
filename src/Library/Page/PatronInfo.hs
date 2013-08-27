@@ -8,9 +8,8 @@ import Database.SQLite.Simple
 import Foundation.Common
 import Foundation.Input
 import Foundation.Layout
-import Foundation.Sections (Page)
 import Library
-import Library.DBTypes
+import Library.DB.Types
 
 import Control.Applicative hiding (optional)
 

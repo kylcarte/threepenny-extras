@@ -5,9 +5,9 @@ import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
 
 import Foundation.Common
-import Foundation.Sections (Page)
 
-import Library.DBTypes
+import Library
+import Library.DB.Types
 import Library.Page.PatronInfo
 
 import Database.SQLite.Simple

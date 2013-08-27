@@ -6,7 +6,7 @@ import Foundation.Layout
 import Foundation.Sections
 import Foundation.Common
 
-import Library.DBTypes
+import Library.DB.Types
 import Library.Page.AddPatron
 import Library.Page.EditPatron
 
