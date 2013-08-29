@@ -35,3 +35,18 @@ executable library
                        threepenny-gui ==0.2.*
   ghc-options:         -Wall
 
+executable test
+  main-is:             Test.hs
+  hs-source-dirs:      src
+  -- other-modules:       
+  build-depends:       base           ==4.6.*         ,
+                       json           >=0.4   && <0.6 ,
+                       transformers   ==0.3.*         ,
+                       time           ==1.4.*         ,
+                       directory      ==1.2.*         ,
+                       process        ==1.1.*         ,
+                       parsec         ==3.1.*         ,
+                       random         ==1.0.*         ,
+                       threepenny-gui ==0.2.*
+  ghc-options:         -Wall
+
