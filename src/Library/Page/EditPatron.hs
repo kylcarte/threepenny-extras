@@ -5,7 +5,7 @@ import Graphics.UI.Threepenny.Core hiding (row)
 
 import Foundation.Common
 import Foundation.Input
-import Foundation.Layout
+-- import Foundation.Layout
 
 import Library
 import Library.DB.Types
@@ -38,7 +38,7 @@ viewPatronInfo (drawArea,btnArea) conn
 
 loadPatronFields :: Element -> Element -> Patron -> PatronInfoLoad
 loadPatronFields btn btnArea pat _ pf = do
-  element btnArea #+ [ element btn ]
+  void $ element btnArea #+ [ element btn ]
   setValue (fstNameFld pf) $ firstName   pat
   setValue (lstNameFld pf) $ lastName    pat
   setValue (phoneFld   pf) $ phoneNumber pat
@@ -56,7 +56,7 @@ loadPatronFields btn btnArea pat _ pf = do
     Phone -> "Phone"
 
 editPatronAction :: PatronInfo (Maybe Integer)
-editPatronAction (alertArea,btnArea) conn _
+editPatronAction (alertArea,_) conn _
   fstNm lstNm
   phone email pref
   home1 home2

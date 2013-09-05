@@ -2,6 +2,8 @@
 
 module Library.DB where
 
+import Library.DB.Types
+
 import Database.SQLite.Simple
 
 import System.Directory
@@ -25,15 +27,13 @@ data DB = DB
   , booksDB     :: Connection
   }
 
-{-
 initDBs :: DBPaths -> IO DB
 initDBs ps = DB
   <$> initDB (patronsDBPath   ps) patronsTable
   <*> initDB (checkOutsDBPath ps) checkOutsTable
   <*> initDB (booksDBPath     ps) booksTable
--}
 
-initDB :: FilePath -> Table -> IO Connection
+initDB :: FilePath -> Table a -> IO Connection
 initDB fp tbl = do
   exists <- doesFileExist fp
   unless exists $ do
@@ -47,13 +47,8 @@ initDB fp tbl = do
   res <- query conn "SELECT name FROM sqlite_master WHERE type = ? AND name = ?" ("table" :: String,queryToString $ tableName tbl)
   when (null (res :: [Only String])) $ do
     putStrLn $ "Creating " ++ (queryToString $ tableName tbl) ++" table."
-    execute_ conn $ undefined -- tableCreate tbl
+    execute_ conn $ mkTableCreate tbl
   return conn
-
-data Table = Table
-  { tableName   :: Query
-  , tableFields :: [(Query,Query)]
-  }
 
 queryToString :: Query -> String
 queryToString = T.unpack . fromQuery

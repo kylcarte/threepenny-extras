@@ -2,8 +2,6 @@
 
 module Library.DB.Types where
 
-import Library.DB
-
 import Database.SQLite.Simple
 import Database.SQLite.Simple.FromField
 import Database.SQLite.Simple.ToField
@@ -12,9 +10,9 @@ import Database.SQLite.Simple.Ok
 import Data.Time
 import System.Locale
 
-import System.Directory
-import System.Exit
-import System.Process
+-- import System.Directory
+-- import System.Exit
+-- import System.Process
 
 import Control.Applicative
 import Control.Monad
@@ -22,11 +20,16 @@ import Data.Char (isDigit)
 import Data.List (intercalate)
 import Data.Monoid
 
--- Patron {{{
+-- Table {{{
+
+data Table a = Table
+  { tableName   :: Query
+  , tableFields :: [(Query,Query)]
+  }
 
 mIntercalate :: Monoid m => m -> [m] -> m
-mIntercalate s [] = mempty
-mIntercalate s [m] = m
+mIntercalate _ [] = mempty
+mIntercalate _ [m] = m
 mIntercalate s (m:ms) = m <> s <> mIntercalate s ms 
 
 unwordsQuery :: [Query] -> Query
@@ -35,18 +38,35 @@ unwordsQuery = mIntercalate " "
 parensQuery :: Query -> Query
 parensQuery q = "(" <> q <> ")"
 
-mkTableCreate :: Query -> [(Query,Query)] -> Query
-mkTableCreate tblName flds = unwordsQuery
+mkTableUpdate :: Table a -> Query
+mkTableUpdate tbl = unwordsQuery
+  [ "UPDATE"
+  , tableName tbl
+  , "SET"
+  , mIntercalate ", " $ map mkField $ tableFields tbl
+  , "WHERE ID = ?"
+  ]
+  where
+  mkField (fld,_) = unwordsQuery [fld,"= ?"]
+
+mkTableCreate :: Table a -> Query
+mkTableCreate tbl = unwordsQuery
   [ "CREATE TABLE"
-  , tblName
+  , tableName tbl
   , parensQuery $
     mIntercalate ", "
     ( "ID INTEGER PRIMARY KEY"
-    : map mkField flds
+    : map mkField (tableFields tbl)
     )
   ]
   where
   mkField (fld,typ) = unwordsQuery [fld,typ,"NOT NULL"]
+
+-- }}}
+
+
+
+-- Patron {{{
 
 data Patron = Patron
   { patronDBId   :: Maybe Integer      -- Maybe, so we can construct Patrons
@@ -61,19 +81,18 @@ data Patron = Patron
   , patronNum    :: Integer
   } deriving (Eq,Show)
 
-patronsTable :: Table
+patronsTable :: Table Patron
 patronsTable = Table "patrons"
-  "CREATE TABLE patrons \
-     \( ID INTEGER PRIMARY KEY\
-     \, firstname TEXT NOT NULL\
-     \, lastname TEXT NOT NULL\
-     \, phonenumber TEXT NOT NULL\
-     \, emailaddr TEXT NOT NULL\
-     \, prefcont INTEGER NOT NULL\
-     \, homeaddr1 TEXT NOT NULL\
-     \, homeaddr2 TEXT NOT NULL\
-     \, citystatezip TEXT NOT NULL\
-     \, patronnum INTEGER NOT NULL)"
+  [ ( "firstname"    , "TEXT"    )
+  , ( "lastname"     , "TEXT"    )
+  , ( "phonenumber"  , "TEXT"    )
+  , ( "emailaddr"    , "TEXT"    )
+  , ( "prefcont"     , "INTEGER" )
+  , ( "homeaddr1"    , "TEXT"    )
+  , ( "homeaddr2"    , "TEXT"    )
+  , ( "citystatezip" , "TEXT"    )
+  , ( "patronnum"    , "INTEGER" )
+  ]
 
 instance FromRow Patron where
   fromRow = Patron
@@ -176,7 +195,7 @@ updatePatron :: Connection -> Patron -> IO ()
 updatePatron conn p = case patronDBId p of
   Nothing   -> fail "Bug: Tried to update patron without providing database ID"
   Just idNo -> execute conn
-    "UPDATE patrons SET firstname = ?, lastname = ?, phonenumber = ?, emailaddr = ?, prefcont = ?, homeaddr1 = ?, homeaddr2 = ?, citystatezip = ?, patronnum = ? WHERE ID = ?"
+    (mkTableUpdate patronsTable)
     ( firstName    p
     , lastName     p
     , phoneNumber  p
@@ -251,8 +270,10 @@ patronNumberTaken conn idNo patNum =
 
 -- Book {{{
 
-booksTable :: Table
-booksTable = Table undefined undefined
+booksTable :: Table a
+booksTable = Table "books"
+  [ ( "isbn" , "TEXT" )
+  ]
 
 -- }}}
 
@@ -267,13 +288,12 @@ data CheckOut = CheckOut
   , checkOutTimeStamp :: TimeStamp
   } deriving (Eq,Show)
 
-checkOutsTable :: Table
+checkOutsTable :: Table CheckOut
 checkOutsTable = Table "checkouts"
-  "CREATE TABLE checkouts \
-     \( ID INTEGER PRIMARY KEY\
-     \, patronid INTEGER NOT NULL\
-     \, bookid INTEGER NOT NULL\
-     \, timestamp TEXT NOT NULL)"
+  [ ( "patronid"  , "INTEGER" )
+  , ( "bookid"    , "INTEGER" )
+  , ( "timestamp" , "TEXT"    )
+  ]
 
 instance FromRow CheckOut where
   fromRow = CheckOut

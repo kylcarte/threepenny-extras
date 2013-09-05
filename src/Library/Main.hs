@@ -6,11 +6,9 @@ import Foundation.Layout
 import Foundation.Sections
 import Foundation.Common
 
-import Library.DB.Types
+import Library.DB
 import Library.Page.AddPatron
 import Library.Page.EditPatron
-
-import Database.SQLite.Simple
 
 import Control.Monad
 

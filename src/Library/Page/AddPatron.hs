@@ -18,7 +18,7 @@ addPatronPage conn = patronInfo' "AddPatron" conn
   noLoadAction
 
 addPatronAction :: PatronInfo ()
-addPatronAction (alertArea,btnArea) conn pf
+addPatronAction (alertArea,_) conn pf
   fstNm lstNm
   phone email pref
   home1 home2
