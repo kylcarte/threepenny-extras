@@ -9,6 +9,7 @@ import Foundation.Common
 import Library.DB
 import Library.Page.AddPatron
 import Library.Page.EditPatron
+import Library.Page.CheckOutSearch
 
 import Control.Monad
 
@@ -39,6 +40,7 @@ mainPage db = collapseRow
     Sections "Tabs" Tabs
       [ ( LabelStr "Add Patron"  , addPatronPage  $ patronsDB db   )
       , ( LabelStr "Edit Patron" , editPatronPage $ checkOutsDB db )
+      , ( LabelStr "Check Out"   , checkOutPage   $ checkOutsDB db )
       ]
   ]
 
